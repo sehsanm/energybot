@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     bale_bot_token: str
     bale_webhook_secret: str
     bale_api_base: str = "https://tapi.bale.ai"
+    bale_mode: str = "webhook"  # webhook | polling
+    bale_poll_timeout: int = 30  # long-poll timeout (seconds), used when bale_mode='polling'
 
     frontier_proxy_url: str | None = None
     frontier_api_key: str

@@ -24,4 +24,6 @@ def test_settings_requires_database_url(monkeypatch):
     monkeypatch.setenv("FRONTIER_API_KEY", "f")
     monkeypatch.setenv("SESSION_SECRET", "z" * 32)
     with pytest.raises(Exception):
-        Settings()
+        # Disable loading from a real .env so this test is hermetic
+        # regardless of whether a dev .env exists in the working directory.
+        Settings(_env_file=None)
