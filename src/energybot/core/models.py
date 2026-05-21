@@ -215,3 +215,38 @@ class AuditLog(Base):
     before: Mapped[dict | None] = mapped_column(JSONB)
     after: Mapped[dict | None] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
+
+
+from datetime import date as _date
+from sqlalchemy import Date, Numeric
+
+
+class LLMCall(Base):
+    __tablename__ = "llm_calls"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    call_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    provider: Mapped[str] = mapped_column(String(40), nullable=False)
+    model: Mapped[str] = mapped_column(String(120), nullable=False)
+    tokens_in: Mapped[int | None] = mapped_column(Integer)
+    tokens_out: Mapped[int | None] = mapped_column(Integer)
+    latency_ms: Mapped[int | None] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    prompt_template_key: Mapped[str | None] = mapped_column(String(80))
+    prompt_template_version: Mapped[int | None] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
+
+
+class ProcessedUpdate(Base):
+    __tablename__ = "processed_updates"
+    update_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False, index=True)
+
+
+class DailyStats(Base):
+    __tablename__ = "daily_stats"
+    date: Mapped[_date] = mapped_column(Date, primary_key=True)
+    dau: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    messages: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    kb_hits: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    llm_cost_usd: Mapped[float] = mapped_column(Numeric(10, 4), default=0, nullable=False)
+    tokens_total: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
