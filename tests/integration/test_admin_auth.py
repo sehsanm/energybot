@@ -24,6 +24,8 @@ async def app(monkeypatch, db_session):
     import energybot.core.db as _db
     _db._engine = None
     _db._sessionmaker = None
+    import energybot.admin_api.auth as _auth
+    _auth._LOGIN_HITS.clear()
     db_session.add(AdminUser(email="a@b.c", password_hash=hash_password("pass1234"), role="admin"))
     await db_session.commit()
     from energybot.main import create_app

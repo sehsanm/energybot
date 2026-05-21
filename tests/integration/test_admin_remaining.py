@@ -20,6 +20,8 @@ async def app(monkeypatch):
     import energybot.core.db as _db
     _db._engine = None
     _db._sessionmaker = None
+    import energybot.admin_api.auth as _auth
+    _auth._LOGIN_HITS.clear()
     from energybot.main import create_app
     return create_app()
 
