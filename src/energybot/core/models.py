@@ -102,3 +102,60 @@ class ChatSummary(Base):
     covers_from_message_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     covers_to_message_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
+
+
+from pgvector.sqlalchemy import Vector
+
+
+class KBArticle(Base):
+    __tablename__ = "kb_articles"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    title: Mapped[str] = mapped_column(String(300), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    category: Mapped[str] = mapped_column(String(20), nullable=False)
+    tags: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="draft", nullable=False)
+    published_at: Mapped[datetime | None] = mapped_column()
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    created_by: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
+    deleted_at: Mapped[datetime | None] = mapped_column()
+
+
+class KBAttachment(Base):
+    __tablename__ = "kb_attachments"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    article_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("kb_articles.id", ondelete="CASCADE"), index=True, nullable=False)
+    type: Mapped[str] = mapped_column(String(10), nullable=False)
+    mime_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    file_size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    storage_path: Mapped[str] = mapped_column(String(500), nullable=False)
+    caption_fa: Mapped[str | None] = mapped_column(Text)
+    order_index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    bale_file_id: Mapped[str | None] = mapped_column(String(200))
+    duration_seconds: Mapped[int | None] = mapped_column(Integer)
+    thumbnail_path: Mapped[str | None] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
+    deleted_at: Mapped[datetime | None] = mapped_column()
+
+
+class VideoTranscript(Base):
+    __tablename__ = "video_transcripts"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    attachment_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("kb_attachments.id", ondelete="CASCADE"), unique=True, nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    is_admin_edited: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
+
+
+class KBChunk(Base):
+    __tablename__ = "kb_chunks"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    article_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("kb_articles.id", ondelete="CASCADE"), index=True, nullable=False)
+    chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    text_normalized: Mapped[str] = mapped_column(Text, nullable=False)
+    embedding: Mapped[list[float]] = mapped_column(Vector(1536), nullable=False)
+    meta: Mapped[dict] = mapped_column("metadata", JSONB, default=dict, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
