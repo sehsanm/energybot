@@ -10,6 +10,11 @@ async def clean_router_tables(db_session):
     await db_session.execute(text("DELETE FROM llm_calls"))
     await db_session.execute(text("DELETE FROM model_configs"))
     await db_session.execute(text("DELETE FROM prompt_templates"))
+    # Children first to avoid FK violations
+    await db_session.execute(text("DELETE FROM profile_events"))
+    await db_session.execute(text("DELETE FROM onboarding_states"))
+    await db_session.execute(text("DELETE FROM profiles"))
+    await db_session.execute(text("DELETE FROM users"))
     await db_session.commit()
     yield
     # Clean after: rollback any failed transaction first, then delete
@@ -20,4 +25,9 @@ async def clean_router_tables(db_session):
     await db_session.execute(text("DELETE FROM llm_calls"))
     await db_session.execute(text("DELETE FROM model_configs"))
     await db_session.execute(text("DELETE FROM prompt_templates"))
+    # Children first to avoid FK violations
+    await db_session.execute(text("DELETE FROM profile_events"))
+    await db_session.execute(text("DELETE FROM onboarding_states"))
+    await db_session.execute(text("DELETE FROM profiles"))
+    await db_session.execute(text("DELETE FROM users"))
     await db_session.commit()
