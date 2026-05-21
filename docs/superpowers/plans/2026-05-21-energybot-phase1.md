@@ -6,7 +6,7 @@
 
 **Architecture:** Single FastAPI service + Postgres (pgvector + pg_trgm) + bundled static Next.js admin SPA. Dual LLM provider router (frontier via proxy + Metis). APScheduler in-process for background jobs. See `docs/superpowers/specs/2026-05-21-energybot-phase1-design.md` for the design.
 
-**Tech Stack:** Python 3.12, FastAPI, SQLAlchemy 2 (async + asyncpg), Alembic, Pydantic 2, pgvector, Jinja2, APScheduler, argon2-cffi, python-magic, tiktoken, httpx, pytest + pytest-asyncio, Next.js 14, TypeScript, Docker.
+**Tech Stack:** Python 3.10+, FastAPI, SQLAlchemy 2 (async + asyncpg), Alembic, Pydantic 2, pgvector, Jinja2, APScheduler, argon2-cffi, python-magic, tiktoken, httpx, pytest + pytest-asyncio, Next.js 14, TypeScript, Docker.
 
 ---
 
@@ -188,7 +188,7 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'energybot'`
 [project]
 name = "energybot"
 version = "0.1.0"
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 dependencies = [
   "fastapi>=0.115",
   "uvicorn[standard]>=0.30",
@@ -214,7 +214,6 @@ dev = [
   "pytest>=8.2",
   "pytest-asyncio>=0.23",
   "pytest-cov>=5.0",
-  "httpx>=0.27",
   "ruff>=0.4",
   "mypy>=1.10",
 ]
@@ -237,7 +236,7 @@ markers = ["llm: tests that hit a live LLM provider (requires --llm)"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py310"
 ```
 
 - [ ] **Step 4: Create the package init**
