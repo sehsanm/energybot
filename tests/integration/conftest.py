@@ -11,6 +11,9 @@ async def clean_router_tables(db_session):
     await db_session.execute(text("DELETE FROM model_configs"))
     await db_session.execute(text("DELETE FROM prompt_templates"))
     # Children first to avoid FK violations
+    await db_session.execute(text("DELETE FROM messages"))
+    await db_session.execute(text("DELETE FROM chat_summaries"))
+    await db_session.execute(text("DELETE FROM chat_sessions"))
     await db_session.execute(text("DELETE FROM profile_events"))
     await db_session.execute(text("DELETE FROM onboarding_states"))
     await db_session.execute(text("DELETE FROM profiles"))
@@ -26,6 +29,9 @@ async def clean_router_tables(db_session):
     await db_session.execute(text("DELETE FROM model_configs"))
     await db_session.execute(text("DELETE FROM prompt_templates"))
     # Children first to avoid FK violations
+    await db_session.execute(text("DELETE FROM messages"))
+    await db_session.execute(text("DELETE FROM chat_summaries"))
+    await db_session.execute(text("DELETE FROM chat_sessions"))
     await db_session.execute(text("DELETE FROM profile_events"))
     await db_session.execute(text("DELETE FROM onboarding_states"))
     await db_session.execute(text("DELETE FROM profiles"))
