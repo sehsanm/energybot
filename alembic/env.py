@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 
 from energybot.core.db import Base
+import energybot.core.models  # noqa: F401  registers all models
 
 config = context.config
 if config.config_file_name is not None:
