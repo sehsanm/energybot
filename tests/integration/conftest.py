@@ -7,6 +7,7 @@ async def clean_router_tables(db_session):
     """Remove seeded rows before and after each test to prevent unique-constraint violations
     across tests that share the same key/call_type."""
     # Clean before the test in case a previous run left data
+    await db_session.execute(text("DELETE FROM processed_updates"))
     # KB tables first (children before parents: kb_chunks → kb_articles, video_transcripts/kb_attachments → kb_articles)
     await db_session.execute(text("DELETE FROM kb_chunks"))
     await db_session.execute(text("DELETE FROM video_transcripts"))
@@ -30,6 +31,7 @@ async def clean_router_tables(db_session):
         await db_session.rollback()
     except Exception:
         pass
+    await db_session.execute(text("DELETE FROM processed_updates"))
     # KB tables first (children before parents)
     await db_session.execute(text("DELETE FROM kb_chunks"))
     await db_session.execute(text("DELETE FROM video_transcripts"))
