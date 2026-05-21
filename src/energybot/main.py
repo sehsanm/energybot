@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from energybot.health import router as health_router
@@ -12,11 +13,22 @@ from energybot.admin_api.models import router as admin_models_router
 from energybot.admin_api.audit_log import router as admin_audit_router
 from energybot.admin_api.stats import router as admin_stats_router
 from energybot.logging import configure_logging
+from energybot.jobs.scheduler import make_scheduler
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    sched = make_scheduler()
+    sched.start()
+    try:
+        yield
+    finally:
+        sched.shutdown(wait=False)
 
 
 def create_app() -> FastAPI:
     configure_logging("INFO")
-    app = FastAPI(title="Energybot")
+    app = FastAPI(title="Energybot", lifespan=lifespan)
     app.include_router(health_router)
     app.include_router(bale_router)
     app.include_router(admin_auth_router)
