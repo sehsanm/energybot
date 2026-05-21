@@ -57,3 +57,48 @@ class OnboardingState(Base):
     answers: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
     started_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
     completed_at: Mapped[datetime | None] = mapped_column()
+
+
+from sqlalchemy import Index
+
+
+class ChatSession(Base):
+    __tablename__ = "chat_sessions"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
+    ended_at: Mapped[datetime | None] = mapped_column()
+    last_summary_id: Mapped[int | None] = mapped_column(BigInteger)
+
+
+class Message(Base):
+    __tablename__ = "messages"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    session_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("chat_sessions.id", ondelete="CASCADE"), nullable=False)
+    role: Mapped[str] = mapped_column(String(20), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    tool_name: Mapped[str | None] = mapped_column(String(80))
+    tool_args: Mapped[dict | None] = mapped_column(JSONB)
+    tool_result: Mapped[dict | None] = mapped_column(JSONB)
+    tokens_in: Mapped[int | None] = mapped_column(Integer)
+    tokens_out: Mapped[int | None] = mapped_column(Integer)
+    latency_ms: Mapped[int | None] = mapped_column(Integer)
+    model_used: Mapped[str | None] = mapped_column(String(120))
+    meta: Mapped[dict] = mapped_column("metadata", JSONB, default=dict, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
+    deleted_at: Mapped[datetime | None] = mapped_column()
+    __table_args__ = (
+        Index("ix_messages_user_created", "user_id", "created_at"),
+    )
+
+
+class ChatSummary(Base):
+    __tablename__ = "chat_summaries"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    session_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    covers_from_message_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    covers_to_message_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
