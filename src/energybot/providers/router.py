@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from energybot.core.models import LLMCall, ModelConfig
+from energybot.metrics import llm_calls
 from energybot.providers.base import ChatRequest, ChatResponse, EmbeddingRequest, EmbeddingResponse, Provider, ProviderError
 
 
@@ -78,3 +79,4 @@ class ProviderRouter:
             prompt_template_key=pkey, prompt_template_version=pver,
         ))
         await session.commit()
+        llm_calls.labels(provider=provider, call_type=call_type, status=status).inc()

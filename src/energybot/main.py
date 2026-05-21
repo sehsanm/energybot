@@ -14,6 +14,7 @@ from energybot.admin_api.audit_log import router as admin_audit_router
 from energybot.admin_api.stats import router as admin_stats_router
 from energybot.logging import configure_logging
 from energybot.jobs.scheduler import make_scheduler
+from energybot.metrics import router as metrics_router
 
 
 @asynccontextmanager
@@ -39,6 +40,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_models_router)
     app.include_router(admin_audit_router)
     app.include_router(admin_stats_router)
+    app.include_router(metrics_router)
     static_dir = os.environ.get("ENERGYBOT_ADMIN_STATIC_DIR", "admin_ui/out")
     if os.path.isdir(static_dir):
         app.mount("/admin", StaticFiles(directory=static_dir, html=True), name="admin")

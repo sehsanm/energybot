@@ -3,6 +3,7 @@ from uuid import UUID
 from energybot.agent.context import ContextAssembler
 from energybot.agent.tools.base import ToolRegistry, to_provider_tool
 from energybot.chat.repository import ChatRepository
+from energybot.metrics import agent_iterations
 from energybot.providers.base import ChatMessage, ChatRequest
 
 
@@ -58,6 +59,7 @@ class AgentLoop:
                                          model_used=resp.model)
             break
 
+        agent_iterations.observe(iters)
         if self._summ is not None:
             await self._summ.maybe_summarize(self._user_id)
         return final or ""
