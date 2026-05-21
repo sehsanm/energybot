@@ -1,4 +1,6 @@
+import os
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from energybot.health import router as health_router
 from energybot.bale_adapter.webhook import router as bale_router
 from energybot.admin_api.auth import router as admin_auth_router
@@ -25,6 +27,9 @@ def create_app() -> FastAPI:
     app.include_router(admin_models_router)
     app.include_router(admin_audit_router)
     app.include_router(admin_stats_router)
+    static_dir = os.environ.get("ENERGYBOT_ADMIN_STATIC_DIR", "admin_ui/out")
+    if os.path.isdir(static_dir):
+        app.mount("/admin", StaticFiles(directory=static_dir, html=True), name="admin")
     return app
 
 
