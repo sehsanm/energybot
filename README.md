@@ -8,10 +8,13 @@ Persian-language energy-saving assistant on Bale messenger.
 2. `python -m venv .venv && . .venv/bin/activate && pip install -e ".[dev]"`
 3. Copy `.env.example` to `.env` and fill values.
 4. `alembic upgrade head`
-5. Seed initial admin: `python -m energybot.admin_cli create-user --email you@x.com --role admin`
-6. Build admin UI: `cd admin_ui && npm install && npm run build && cd ..`
-7. Run: `uvicorn energybot.main:app --reload`
-8. Open `http://localhost:8000/admin/`.
+5. Seed default prompts, model configs, and the starter Persian KB: `python scripts/seed_dev.py`
+   - Idempotent. Uses deterministic fake embeddings by default so retrieval works without LLM keys; pass `--real-embeddings` to call the configured embed provider. See `python scripts/seed_dev.py --help` for `--keep-drafts`, `--force-articles`, `--reset-prompts`, etc.
+   - Content lives in `scripts/seed_data/`: 4 prompt templates and 14 KB articles split across `electricity`, `gas`, and `general`.
+6. Seed initial admin: `python -m energybot.admin_cli create-user --email you@x.com --role admin`
+7. Build admin UI: `cd admin_ui && npm install && npm run build && cd ..`
+8. Run: `uvicorn energybot.main:app --reload`
+9. Open `http://localhost:8000/admin/`.
 
 ## Tests
 
