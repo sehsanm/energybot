@@ -16,7 +16,7 @@ COPY pyproject.toml ./
 COPY alembic.ini ./
 COPY alembic ./alembic
 COPY src ./src
-RUN pip install --no-cache-dir --no-index --find-links=/wheels -e .
+RUN pip install --no-cache-dir --no-index --find-links=/wheels --no-build-isolation -e .
 COPY admin_ui/out ./admin_ui/out
 COPY .deploy/tiktoken-cache /tmp/data-gym-cache
 ENV ENERGYBOT_ADMIN_STATIC_DIR=/app/admin_ui/out
