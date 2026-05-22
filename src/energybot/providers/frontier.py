@@ -15,6 +15,8 @@ def _to_openai_messages(msgs: list[ChatMessage]) -> list[dict[str, Any]]:
             d["tool_call_id"] = m.tool_call_id
         if m.tool_calls:
             d["tool_calls"] = m.tool_calls
+        if m.reasoning_content is not None:
+            d["reasoning_content"] = m.reasoning_content
         out.append(d)
     return out
 
@@ -77,6 +79,7 @@ class FrontierProvider:
             tokens_out=usage.get("completion_tokens", 0),
             finish_reason=choice.get("finish_reason", "stop"),
             model=data.get("model"),
+            reasoning_content=msg.get("reasoning_content"),
         )
 
     async def embed(self, req: EmbeddingRequest) -> EmbeddingResponse:

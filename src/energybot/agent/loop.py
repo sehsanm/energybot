@@ -35,7 +35,10 @@ class AgentLoop:
                                            prompt_key=ctx.prompt_template_key,
                                            prompt_version=ctx.prompt_template_version)
             if resp.tool_calls and iters < self._cap:
-                messages.append(ChatMessage(role="assistant", content=resp.content or "", tool_calls=resp.tool_calls))
+                messages.append(ChatMessage(
+                    role="assistant", content=resp.content or "", tool_calls=resp.tool_calls,
+                    reasoning_content=resp.reasoning_content,
+                ))
                 for tc in resp.tool_calls:
                     name = tc["function"]["name"] if "function" in tc else tc.get("name", "")
                     raw_args = tc["function"]["arguments"] if "function" in tc else tc.get("arguments", "{}")

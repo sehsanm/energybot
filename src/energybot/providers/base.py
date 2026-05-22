@@ -8,6 +8,9 @@ class ChatMessage(BaseModel):
     name: str | None = None
     tool_call_id: str | None = None
     tool_calls: list[dict[str, Any]] | None = None
+    # DeepSeek V4 thinking-mode replay contract: once a turn emits reasoning_content, every
+    # subsequent assistant message we send back must include it or the API rejects the request.
+    reasoning_content: str | None = None
 
 
 class Tool(BaseModel):
@@ -32,6 +35,7 @@ class ChatResponse(BaseModel):
     tokens_out: int
     finish_reason: str
     model: str | None = None
+    reasoning_content: str | None = None
 
 
 class EmbeddingRequest(BaseModel):
