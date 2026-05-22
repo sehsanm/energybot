@@ -6,7 +6,9 @@ COPY admin_ui/ ./
 RUN npm run build
 
 FROM python:3.12-slim AS runtime
-RUN apt-get update && apt-get install -y --no-install-recommends libmagic1 ca-certificates && rm -rf /var/lib/apt/lists/*
+ARG APT_MIRROR=
+RUN if [ -n "$APT_MIRROR" ]; then sed -i "s|http://deb.debian.org|http://$APT_MIRROR|g" /etc/apt/sources.list.d/debian.sources; fi \
+ && apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y --no-install-recommends libmagic1 ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY pyproject.toml ./
 COPY alembic.ini ./
