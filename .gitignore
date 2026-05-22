@@ -19,3 +19,4 @@ build/
 *.log
 /var/lib/energybot/
 /data/
+.deploy/wheels/

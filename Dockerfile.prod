@@ -1,20 +1,22 @@
-# Prod Dockerfile: skips the Node admin-build stage (npm registry flaky from this VPS).
-# Build admin_ui/out/ on dev machine and copy into build context before "docker compose build".
+# Prod Dockerfile: skips the Node admin-build stage and installs deps from
+# pre-downloaded wheels in .deploy/wheels/ (so the prod build never has to
+# reach pypi.org or a third-party Iran mirror, which are unreliable / paywalled).
+#
+# bin/deploy.sh refreshes .deploy/wheels/ and admin_ui/out/ on each deploy.
 FROM python:3.12-slim
 ARG APT_MIRROR=
-ARG PIP_INDEX_URL=
 RUN if [ -n "$APT_MIRROR" ]; then sed -i "s|http://deb.debian.org|http://$APT_MIRROR|g" /etc/apt/sources.list.d/debian.sources; fi \
  && apt-get -o Acquire::Check-Valid-Until=false update \
  && apt-get install -y --no-install-recommends libmagic1 ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 ENV PYTHONUNBUFFERED=1
+COPY .deploy/wheels /wheels
 COPY pyproject.toml ./
 COPY alembic.ini ./
 COPY alembic ./alembic
 COPY src ./src
-RUN if [ -n "$PIP_INDEX_URL" ]; then pip config set global.index-url "$PIP_INDEX_URL"; fi \
- && pip install --no-cache-dir -e .
+RUN pip install --no-cache-dir --no-index --find-links=/wheels -e .
 COPY admin_ui/out ./admin_ui/out
 COPY .deploy/tiktoken-cache /tmp/data-gym-cache
 ENV ENERGYBOT_ADMIN_STATIC_DIR=/app/admin_ui/out

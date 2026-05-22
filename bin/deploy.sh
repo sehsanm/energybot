@@ -45,6 +45,24 @@ fi
 say "[local] Building admin UI"
 (cd admin_ui && npm run build >/dev/null)
 
+# --- Refresh prod wheels locally ---------------------------------------
+# Run pip download inside python:3.12-slim so platform tags (manylinux x86_64,
+# cp312) match what the prod image will install. Iran-hosted PyPI mirrors are
+# either flaky or paywall some packages (argon2-cffi), so prod's pip runs with
+# --no-index off these wheels instead.
+say "[local] Refreshing .deploy/wheels/"
+rm -rf "$REPO_ROOT/.deploy/wheels"
+mkdir -p "$REPO_ROOT/.deploy/wheels"
+docker run --rm \
+  -v "$REPO_ROOT/.deploy/wheels:/wheels" \
+  -v "$REPO_ROOT/pyproject.toml:/pyproject.toml:ro" \
+  python:3.12-slim sh -c '
+    pip install -q tomli &&
+    python -c "import tomli; print(chr(10).join(tomli.load(open(\"/pyproject.toml\",\"rb\"))[\"project\"][\"dependencies\"]))" > /tmp/req.txt &&
+    pip download -q -d /wheels -r /tmp/req.txt
+  ' >/dev/null
+echo "  $(ls "$REPO_ROOT/.deploy/wheels" | wc -l) wheels, $(du -sh "$REPO_ROOT/.deploy/wheels" | cut -f1)"
+
 # --- Sync code on remote ------------------------------------------------
 if [[ $RESET -eq 1 ]]; then
   say "[remote] Resetting working tree to origin/$BRANCH"
@@ -54,9 +72,13 @@ else
   ssh "$REMOTE" "cd $REMOTE_DIR && git fetch origin && git checkout $BRANCH && git pull --ff-only origin $BRANCH"
 fi
 
-# --- Ship pre-built admin_ui/out/ --------------------------------------
+# --- Ship pre-built admin_ui/out/ + .deploy/wheels/ --------------------
 say "[remote] Shipping admin_ui/out/"
 tar -C admin_ui -cf - out/ | ssh "$REMOTE" "tar -C $REMOTE_DIR/admin_ui -xf -"
+
+say "[remote] Shipping .deploy/wheels/"
+ssh "$REMOTE" "rm -rf $REMOTE_DIR/.deploy/wheels && mkdir -p $REMOTE_DIR/.deploy/wheels"
+tar -C .deploy -cf - wheels/ | ssh "$REMOTE" "tar -C $REMOTE_DIR/.deploy -xf -"
 
 # --- Build new image ----------------------------------------------------
 say "[remote] Building image"
