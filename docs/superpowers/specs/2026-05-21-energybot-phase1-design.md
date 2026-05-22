@@ -613,7 +613,7 @@ A Next.js SPA built as a static export, served by FastAPI at `/admin/*`. **Persi
 ### 7.1 Deployment topology
 
 - One Linux VPS (Iran-hosted; ArvanCloud or similar). 2 vCPU / 4 GB RAM sufficient for Phase 1.
-- One Docker image: FastAPI + Uvicorn workers + static admin SPA bundled at `/admin/*`.
+- One Docker image: FastAPI + Uvicorn workers + static admin SPA bundled at `/admin/*`. Python 3.10+ (the Docker image uses 3.12 for production; local dev works on 3.10+).
 - One Postgres 16 with `pgvector` and `pg_trgm`. Co-located on the same VPS for Phase 1. Nightly logical backup (`pg_dump`) to off-box storage.
 - Reverse proxy: Caddy or nginx for TLS termination (Let's Encrypt).
   - `POST /bale/webhook` — accepts only Bale IP ranges if known, otherwise enforces shared-secret in path + header.

@@ -1,0 +1,25 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: energybot-db
+    environment:
+      POSTGRES_USER: energybot
+      POSTGRES_PASSWORD: energybot
+      POSTGRES_DB: energybot
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+  app:
+    build: .
+    depends_on: [db]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://energybot:energybot@db:5432/energybot
+      BALE_BOT_TOKEN: ${BALE_BOT_TOKEN}
+      BALE_WEBHOOK_SECRET: ${BALE_WEBHOOK_SECRET}
+      FRONTIER_API_KEY: ${FRONTIER_API_KEY}
+      METIS_API_KEY: ${METIS_API_KEY}
+      SESSION_SECRET: ${SESSION_SECRET}
+    ports: ["8000:8000"]
+    volumes: ["media:/var/lib/energybot/media"]
+volumes:
+  pgdata: {}
+  media: {}
