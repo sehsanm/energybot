@@ -27,14 +27,13 @@ class BaleClient:
         return int(data["result"]["message_id"])
 
     async def send_chat_action(self, *, chat_id: int, action: str = "typing") -> None:
-        # Fire-and-forget: Bale doesn't always support sendChatAction (some versions
-        # of the API return 400). The "typing..." indicator is a nice-to-have, so
-        # we never let a failure here abort the turn.
+        # The typing indicator is cosmetic — a transient failure here shouldn't
+        # abort the turn. Log at WARNING so persistent regressions stay visible.
         from energybot.logging import get_logger
         try:
             await self._post_json("sendChatAction", {"chat_id": chat_id, "action": action})
         except Exception as e:  # noqa: BLE001
-            get_logger(__name__).debug("send_chat_action_failed", error=str(e), action=action)
+            get_logger(__name__).warning("send_chat_action_failed", error=str(e), action=action)
 
     async def answer_callback_query(self, *, callback_query_id: str, text: str | None = None) -> None:
         await self._post_json("answerCallbackQuery", {"callback_query_id": callback_query_id, "text": text or ""})
