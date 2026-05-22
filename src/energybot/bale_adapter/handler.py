@@ -36,14 +36,11 @@ def build_agent_for_user(user_id, chat_id, session_factory):
     from energybot.agent.tools.send_kb_media import SendKBMediaTool
     from energybot.chat.repository import ChatRepository
     from energybot.kb.retrieval import RetrievalService
-    from energybot.providers.frontier import FrontierProvider
-    from energybot.providers.metis import MetisProvider
+    from energybot.providers.factory import build_providers
     from energybot.providers.router import ProviderRouter
 
     s = get_settings()
-    frontier = FrontierProvider(api_key=s.frontier_api_key, base_url=s.frontier_base_url, proxy_url=s.frontier_proxy_url)
-    metis = MetisProvider(api_key=s.metis_api_key, base_url=s.metis_base_url)
-    router = ProviderRouter(providers={"frontier": frontier, "metis": metis}, session_factory=session_factory)
+    router = ProviderRouter(providers=build_providers(s), session_factory=session_factory)
     chat_repo = ChatRepository(session_factory=session_factory, idle_minutes=s.session_idle_minutes)
     profile_repo = ProfileRepository(session_factory=session_factory)
     loader = PromptLoader(session_factory=session_factory)

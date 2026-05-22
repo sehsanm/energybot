@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     metis_api_key: str
     metis_base_url: str = "https://api.metisai.ir/openai/v1"
 
+    deepseek_api_key: str = ""
+    deepseek_base_url: str = "https://api.deepseek.com/v1"
+    deepseek_proxy_url: str | None = None
+
     session_secret: str = Field(..., min_length=32)
     media_root: str = "/var/lib/energybot/media"
 

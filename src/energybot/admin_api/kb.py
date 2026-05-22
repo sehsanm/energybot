@@ -9,8 +9,7 @@ from energybot.kb.media_storage import MediaStorage
 from energybot.kb.publish import PublishService
 from energybot.kb.repository import KBRepository
 from energybot.kb.retrieval import RetrievalService
-from energybot.providers.frontier import FrontierProvider
-from energybot.providers.metis import MetisProvider
+from energybot.providers.factory import build_providers
 from energybot.providers.router import ProviderRouter
 from energybot.settings import get_settings
 
@@ -19,13 +18,7 @@ router = APIRouter(prefix="/api/admin/kb", tags=["admin-kb"])
 
 def build_router_for_admin(session_factory):
     s = get_settings()
-    return ProviderRouter(
-        providers={
-            "frontier": FrontierProvider(api_key=s.frontier_api_key, base_url=s.frontier_base_url, proxy_url=s.frontier_proxy_url),
-            "metis": MetisProvider(api_key=s.metis_api_key, base_url=s.metis_base_url),
-        },
-        session_factory=session_factory,
-    )
+    return ProviderRouter(providers=build_providers(s), session_factory=session_factory)
 
 
 def _session_factory(s: AsyncSession):
