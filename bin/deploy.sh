@@ -17,7 +17,7 @@
 # of these env vars before running deploy — they are forwarded as docker
 # build args. Pick mirrors known to work from your VPS:
 #
-DEPLOY_NPM_REGISTRY=https://registry.npmmirror.com
+DEPLOY_NPM_REGISTRY=https://mirror.abrha.net/repository/npm/
 DEPLOY_PIP_INDEX_URL=https://mirror.abrha.net/repository/pypi/simple
 #DEPLOY_PIP_EXTRA_INDEX_URL=https://pypi.org/simple
 DEPLOY_APT_MIRROR=mirror.arvancloud.ir
