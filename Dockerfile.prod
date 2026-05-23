@@ -1,23 +1,45 @@
-# Prod Dockerfile: skips the Node admin-build stage and installs deps from
-# pre-downloaded wheels in .deploy/wheels/ (so the prod build never has to
-# reach pypi.org or a third-party Iran mirror, which are unreliable / paywalled).
+# Prod Dockerfile: builds the admin UI and installs Python deps entirely
+# on the build machine (which, via bin/deploy.sh, is the production server).
+# The operator's laptop no longer downloads npm packages or pip wheels.
 #
-# bin/deploy.sh refreshes .deploy/wheels/ and admin_ui/out/ on each deploy.
-FROM python:3.12-slim
+# Optional build args route the build through regional mirrors when the
+# canonical registries are unreliable from the VPS (the original reason
+# for shipping pre-built artifacts):
+#
+#   --build-arg APT_MIRROR=mirrors.aliyun.com/debian
+#   --build-arg NPM_REGISTRY=https://registry.npmmirror.com
+#   --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+#   --build-arg PIP_EXTRA_INDEX_URL=https://pypi.org/simple
+#
+# All are optional; defaults talk to the canonical upstreams.
+
+FROM node:20-alpine AS admin-build
+ARG NPM_REGISTRY=
+WORKDIR /admin
+COPY admin_ui/package.json admin_ui/package-lock.json* ./
+RUN if [ -n "$NPM_REGISTRY" ]; then npm config set registry "$NPM_REGISTRY"; fi \
+ && npm install
+COPY admin_ui/ ./
+RUN npm run build
+
+FROM python:3.12-slim AS runtime
 ARG APT_MIRROR=
+ARG PIP_INDEX_URL=
+ARG PIP_EXTRA_INDEX_URL=
 RUN if [ -n "$APT_MIRROR" ]; then sed -i "s|http://deb.debian.org|http://$APT_MIRROR|g" /etc/apt/sources.list.d/debian.sources; fi \
  && apt-get -o Acquire::Check-Valid-Until=false update \
  && apt-get install -y --no-install-recommends libmagic1 ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 ENV PYTHONUNBUFFERED=1
-COPY .deploy/wheels /wheels
 COPY pyproject.toml ./
 COPY alembic.ini ./
 COPY alembic ./alembic
 COPY src ./src
-RUN pip install --no-cache-dir --no-index --find-links=/wheels --no-build-isolation -e .
-COPY admin_ui/out ./admin_ui/out
+RUN if [ -n "$PIP_INDEX_URL" ]; then pip config set global.index-url "$PIP_INDEX_URL"; fi \
+ && if [ -n "$PIP_EXTRA_INDEX_URL" ]; then pip config set global.extra-index-url "$PIP_EXTRA_INDEX_URL"; fi \
+ && pip install --no-cache-dir --no-build-isolation -e .
+COPY --from=admin-build /admin/out ./admin_ui/out
 COPY .deploy/tiktoken-cache /tmp/data-gym-cache
 ENV ENERGYBOT_ADMIN_STATIC_DIR=/app/admin_ui/out
 ENV MEDIA_ROOT=/var/lib/energybot/media

@@ -6,13 +6,21 @@
 #   2. ./bin/deploy.sh           # normal deploy
 #      ./bin/deploy.sh --reset   # discard any drift on the server and resync to origin/main
 #
-# What it does on the server:
-#   git pull → docker compose build → alembic upgrade head (ephemeral container) →
-#   docker compose up -d → health check.
+# What it does on the server (no laptop bandwidth besides the SSH control
+# channel — no wheels or admin static files are uploaded from the laptop):
+#   git pull → docker compose build (npm install + pip install happen on
+#   the server inside the image build) → alembic upgrade head → docker
+#   compose up -d → health check.
 #
-# Admin UI is built locally and shipped as static files because npm registry is
-# flaky from the Iran VPS. See docker-compose.override.yml + Dockerfile.prod for the
-# Iran-mirror build args (apt + pip).
+# If the server can't reach the canonical registries (Iran VPS often can't
+# reach pypi.org / registry.npmjs.org / deb.debian.org reliably), set any
+# of these env vars before running deploy — they are forwarded as docker
+# build args. Pick mirrors known to work from your VPS:
+#
+#   DEPLOY_NPM_REGISTRY=https://registry.npmmirror.com
+#   DEPLOY_PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+#   DEPLOY_PIP_EXTRA_INDEX_URL=https://pypi.org/simple
+#   DEPLOY_APT_MIRROR=mirrors.aliyun.com/debian
 
 set -euo pipefail
 
@@ -34,34 +42,12 @@ say() { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
 
 # --- Local sanity checks -------------------------------------------------
 say "[local] Sanity check"
-if ! git diff --quiet HEAD -- ':!.claude' ':!admin_ui/out'; then
+if ! git diff --quiet HEAD -- ':!.claude'; then
   echo "WARNING: tracked files have uncommitted local edits. They will NOT be deployed:"
-  git status --short -- ':!.claude' ':!admin_ui/out'
+  git status --short -- ':!.claude'
   read -rp "Continue with what's already pushed to origin/$BRANCH? [y/N] " ans
   [[ $ans == y || $ans == Y ]] || exit 1
 fi
-
-# --- Build admin UI locally ---------------------------------------------
-say "[local] Building admin UI"
-(cd admin_ui && npm run build >/dev/null)
-
-# --- Refresh prod wheels locally ---------------------------------------
-# Run pip download inside python:3.12-slim so platform tags (manylinux x86_64,
-# cp312) match what the prod image will install. Iran-hosted PyPI mirrors are
-# either flaky or paywall some packages (argon2-cffi), so prod's pip runs with
-# --no-index off these wheels instead.
-say "[local] Refreshing .deploy/wheels/"
-rm -rf "$REPO_ROOT/.deploy/wheels"
-mkdir -p "$REPO_ROOT/.deploy/wheels"
-docker run --rm \
-  -v "$REPO_ROOT/.deploy/wheels:/wheels" \
-  -v "$REPO_ROOT/pyproject.toml:/pyproject.toml:ro" \
-  python:3.12-slim sh -c '
-    pip install -q tomli &&
-    python -c "import tomli; print(chr(10).join(tomli.load(open(\"/pyproject.toml\",\"rb\"))[\"project\"][\"dependencies\"]))" > /tmp/req.txt &&
-    pip download -q -d /wheels -r /tmp/req.txt
-  ' >/dev/null
-echo "  $(ls "$REPO_ROOT/.deploy/wheels" | wc -l) wheels, $(du -sh "$REPO_ROOT/.deploy/wheels" | cut -f1)"
 
 # --- Sync code on remote ------------------------------------------------
 if [[ $RESET -eq 1 ]]; then
@@ -72,17 +58,23 @@ else
   ssh "$REMOTE" "cd $REMOTE_DIR && git fetch origin && git checkout $BRANCH && git pull --ff-only origin $BRANCH"
 fi
 
-# --- Ship pre-built admin_ui/out/ + .deploy/wheels/ --------------------
-say "[remote] Shipping admin_ui/out/"
-tar -C admin_ui -cf - out/ | ssh "$REMOTE" "tar -C $REMOTE_DIR/admin_ui -xf -"
+# --- Forward optional mirror build args --------------------------------
+BUILD_ARGS=""
+for v in NPM_REGISTRY PIP_INDEX_URL PIP_EXTRA_INDEX_URL APT_MIRROR; do
+  src_var="DEPLOY_$v"
+  val=${!src_var:-}
+  if [[ -n "$val" ]]; then
+    # printf %q quotes the value safely for the remote shell.
+    BUILD_ARGS+=" --build-arg $v=$(printf %q "$val")"
+  fi
+done
+if [[ -n "$BUILD_ARGS" ]]; then
+  echo "  forwarding build args:$BUILD_ARGS"
+fi
 
-say "[remote] Shipping .deploy/wheels/"
-ssh "$REMOTE" "rm -rf $REMOTE_DIR/.deploy/wheels && mkdir -p $REMOTE_DIR/.deploy/wheels"
-tar -C .deploy -cf - wheels/ | ssh "$REMOTE" "tar -C $REMOTE_DIR/.deploy -xf -"
-
-# --- Build new image ----------------------------------------------------
+# --- Build new image on remote (npm + pip happen on the server) --------
 say "[remote] Building image"
-ssh "$REMOTE" "cd $REMOTE_DIR && docker compose build app"
+ssh "$REMOTE" "cd $REMOTE_DIR && docker compose build${BUILD_ARGS} app"
 
 # --- Run migrations with NEW image, against existing DB ----------------
 say "[remote] Running migrations"
