@@ -17,10 +17,10 @@
 # of these env vars before running deploy — they are forwarded as docker
 # build args. Pick mirrors known to work from your VPS:
 #
-#   DEPLOY_NPM_REGISTRY=https://registry.npmmirror.com
-#   DEPLOY_PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
-#   DEPLOY_PIP_EXTRA_INDEX_URL=https://pypi.org/simple
-#   DEPLOY_APT_MIRROR=mirrors.aliyun.com/debian
+DEPLOY_NPM_REGISTRY=https://registry.npmmirror.com
+DEPLOY_PIP_INDEX_URL=https://mirror.abrha.net/repository/pypi/simple
+#DEPLOY_PIP_EXTRA_INDEX_URL=https://pypi.org/simple
+DEPLOY_APT_MIRROR=mirror.arvancloud.ir
 
 set -euo pipefail
 
@@ -72,17 +72,22 @@ if [[ -n "$BUILD_ARGS" ]]; then
   echo "  forwarding build args:$BUILD_ARGS"
 fi
 
+# Force the prod Dockerfile for all compose calls. docker-compose.yml reads
+# this via ${DOCKERFILE:-Dockerfile}, so local dev (with DOCKERFILE unset)
+# still uses the dev Dockerfile.
+REMOTE_ENV="DOCKERFILE=Dockerfile.prod"
+
 # --- Build new image on remote (npm + pip happen on the server) --------
-say "[remote] Building image"
-ssh "$REMOTE" "cd $REMOTE_DIR && docker compose build${BUILD_ARGS} app"
+say "[remote] Building image (Dockerfile.prod)"
+ssh "$REMOTE" "cd $REMOTE_DIR && $REMOTE_ENV docker compose build${BUILD_ARGS} app"
 
 # --- Run migrations with NEW image, against existing DB ----------------
 say "[remote] Running migrations"
-ssh "$REMOTE" "cd $REMOTE_DIR && docker compose run --rm app alembic upgrade head"
+ssh "$REMOTE" "cd $REMOTE_DIR && $REMOTE_ENV docker compose run --rm app alembic upgrade head"
 
 # --- Swap app container to new image -----------------------------------
 say "[remote] Swapping app container"
-ssh "$REMOTE" "cd $REMOTE_DIR && docker compose up -d"
+ssh "$REMOTE" "cd $REMOTE_DIR && $REMOTE_ENV docker compose up -d"
 
 # --- Health check -------------------------------------------------------
 say "[remote] Health check"
