@@ -13,7 +13,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [user, setUser] = React.useState<User>(null);
   const [checked, setChecked] = React.useState(false);
-  const isLogin = pathname === "/login";
+  const isLogin = pathname === "/login" || pathname === "/login/";
 
   React.useEffect(() => {
     if (isLogin) {

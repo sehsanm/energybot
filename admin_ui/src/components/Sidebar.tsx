@@ -53,8 +53,9 @@ const groups: NavGroup[] = [
 
 function isActive(pathname: string | null, href: string) {
   if (!pathname) return false;
-  if (href === "/dashboard") return pathname === "/dashboard" || pathname === "/";
-  return pathname.startsWith(href);
+  const p = pathname.replace(/\/$/, "") || "/";
+  if (href === "/dashboard") return p === "/dashboard" || p === "/";
+  return p === href || p.startsWith(href + "/");
 }
 
 export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
