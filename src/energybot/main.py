@@ -3,6 +3,8 @@ import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.types import Scope
 from energybot.health import router as health_router
 from energybot.bale_adapter.poller import BalePoller
 from energybot.bale_adapter.webhook import router as bale_router
@@ -18,6 +20,35 @@ from energybot.logging import configure_logging, get_logger
 from energybot.jobs.scheduler import make_scheduler
 from energybot.metrics import router as metrics_router
 from energybot.settings import get_settings
+
+
+class _AdminSpaStatic(StaticFiles):
+    # Next.js static export prerenders dynamic routes as `<segment>/_/index.html`.
+    # Rewrite direct hits on real ids to the placeholder so the client router can hydrate.
+    _SPA_PREFIXES: tuple[tuple[tuple[str, ...], str], ...] = (
+        (("kb", "articles"), "kb/articles/_/index.html"),
+        (("users",), "users/_/index.html"),
+        (("chats",), "chats/_/index.html"),
+    )
+    _RESERVED_SEGMENTS = {"_", "new"}
+
+    async def get_response(self, path: str, scope: Scope):
+        try:
+            response = await super().get_response(path, scope)
+        except StarletteHTTPException as exc:
+            if exc.status_code != 404:
+                raise
+            response = None
+        if response is not None and response.status_code != 404:
+            return response
+        parts = [p for p in path.split("/") if p]
+        for prefix, placeholder in self._SPA_PREFIXES:
+            n = len(prefix)
+            if len(parts) == n + 1 and tuple(parts[:n]) == prefix and parts[n] not in self._RESERVED_SEGMENTS:
+                return await super().get_response(placeholder, scope)
+        if response is not None:
+            return response
+        raise StarletteHTTPException(status_code=404)
 
 
 @asynccontextmanager
@@ -69,7 +100,7 @@ def create_app() -> FastAPI:
     app.include_router(metrics_router)
     static_dir = os.environ.get("ENERGYBOT_ADMIN_STATIC_DIR", "admin_ui/out")
     if os.path.isdir(static_dir):
-        app.mount("/admin", StaticFiles(directory=static_dir, html=True), name="admin")
+        app.mount("/admin", _AdminSpaStatic(directory=static_dir, html=True), name="admin")
     return app
 
 
