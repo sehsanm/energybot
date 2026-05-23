@@ -35,6 +35,7 @@ def _client_ip(request: Request) -> str:
 
 async def current_admin(
     request: Request,
+    response: Response,
     energybot_admin: Annotated[str | None, Cookie()] = None,
     session: AsyncSession = Depends(get_session),
 ) -> AdminUser:
@@ -49,12 +50,11 @@ async def current_admin(
     user = (await session.execute(select(AdminUser).where(AdminUser.id == row.admin_user_id))).scalar_one()
     if not user.is_active:
         raise HTTPException(status_code=401, detail="inactive")
-    # CSRF check on write methods
+    s = get_settings()
+    expected = sign_csrf(s.session_secret, sid)
+    response.headers["x-csrf"] = expected
     if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
-        s = get_settings()
-        provided = request.headers.get("x-csrf")
-        expected = sign_csrf(s.session_secret, sid)
-        if provided != expected:
+        if request.headers.get("x-csrf") != expected:
             raise HTTPException(status_code=403, detail="bad csrf")
     return user
 
