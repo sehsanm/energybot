@@ -38,7 +38,7 @@ COPY alembic ./alembic
 COPY src ./src
 RUN if [ -n "$PIP_INDEX_URL" ]; then pip config set global.index-url "$PIP_INDEX_URL"; fi \
  && if [ -n "$PIP_EXTRA_INDEX_URL" ]; then pip config set global.extra-index-url "$PIP_EXTRA_INDEX_URL"; fi \
- && pip install --no-cache-dir --no-build-isolation -e .
+ && pip install --no-cache-dir -e .
 COPY --from=admin-build /admin/out ./admin_ui/out
 COPY .deploy/tiktoken-cache /tmp/data-gym-cache
 ENV ENERGYBOT_ADMIN_STATIC_DIR=/app/admin_ui/out
