@@ -22,6 +22,15 @@ RUN if [ -n "$NPM_REGISTRY" ]; then npm config set registry "$NPM_REGISTRY"; fi 
 COPY admin_ui/ ./
 RUN npm run build
 
+FROM node:20-alpine AS landing-build
+ARG NPM_REGISTRY=
+WORKDIR /landing
+COPY landing_ui/package.json landing_ui/package-lock.json* ./
+RUN if [ -n "$NPM_REGISTRY" ]; then npm config set registry "$NPM_REGISTRY"; fi \
+ && npm install
+COPY landing_ui/ ./
+RUN npm run build
+
 FROM python:3.12-slim AS runtime
 ARG APT_MIRROR=
 ARG PIP_INDEX_URL=
@@ -40,8 +49,10 @@ RUN if [ -n "$PIP_INDEX_URL" ]; then pip config set global.index-url "$PIP_INDEX
  && if [ -n "$PIP_EXTRA_INDEX_URL" ]; then pip config set global.extra-index-url "$PIP_EXTRA_INDEX_URL"; fi \
  && pip install --no-cache-dir -e .
 COPY --from=admin-build /admin/out ./admin_ui/out
+COPY --from=landing-build /landing/out ./landing_ui/out
 COPY .deploy/tiktoken-cache /tmp/data-gym-cache
 ENV ENERGYBOT_ADMIN_STATIC_DIR=/app/admin_ui/out
+ENV ENERGYBOT_LANDING_STATIC_DIR=/app/landing_ui/out
 ENV MEDIA_ROOT=/var/lib/energybot/media
 RUN mkdir -p $MEDIA_ROOT
 EXPOSE 8000
