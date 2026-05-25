@@ -93,7 +93,7 @@ function Hero() {
 
         <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <a
-            href="https://ble.ir/"
+            href="https://ble.ir/AvidEnergybot"
             target="_blank"
             rel="noopener noreferrer"
             className="group inline-flex h-12 items-center gap-2 rounded-full bg-foreground px-6 text-sm font-semibold text-background shadow-lg transition hover:opacity-90 cursor-pointer"
@@ -287,7 +287,7 @@ function FinalCTA() {
         </p>
         <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <a
-            href="https://ble.ir/"
+            href="https://ble.ir/AvidEnergybot"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex h-12 items-center gap-2 rounded-full bg-foreground px-6 text-sm font-semibold text-background shadow-lg transition hover:opacity-90 cursor-pointer"
