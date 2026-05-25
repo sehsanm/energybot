@@ -4,7 +4,9 @@
       "WebFetch(domain:docs.bale.ai)",
       "WebSearch",
       "Bash(ssh arvandev:*)",
-      "Bash(git push origin :*)"
+      "Bash(git push origin :*)",
+      "Bash(curl -sS -o /dev/null -w 'HTTP %{http_code}  ip=%{remote_ip}\\\\n' --max-time 10 http://ai.avidenergy.ir/health)",
+      "Bash(curl -sS -o /dev/null -w 'HTTP %{http_code}  ip=%{remote_ip}\\\\n' --max-time 10 http://solar.avidenergy.ir/)"
     ]
   }
 }

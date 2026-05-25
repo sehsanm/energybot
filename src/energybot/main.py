@@ -101,6 +101,9 @@ def create_app() -> FastAPI:
     static_dir = os.environ.get("ENERGYBOT_ADMIN_STATIC_DIR", "admin_ui/out")
     if os.path.isdir(static_dir):
         app.mount("/admin", _AdminSpaStatic(directory=static_dir, html=True), name="admin")
+    landing_dir = os.environ.get("ENERGYBOT_LANDING_STATIC_DIR", "landing_ui/out")
+    if os.path.isdir(landing_dir):
+        app.mount("/", StaticFiles(directory=landing_dir, html=True), name="landing")
     return app
 
 
