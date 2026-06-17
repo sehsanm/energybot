@@ -28,3 +28,18 @@ def test_goals_and_commitments_rendered():
     )
     assert "کاهش قبض برق" in out
     assert "ترموستات روی ۲۱" in out
+
+
+def test_render_bills_line_with_trend():
+    from energybot.profile.render import render_bills_line
+    line = render_bills_line([
+        {"utility_type": "electricity", "amount": 130000, "term": "1404/03"},
+        {"utility_type": "electricity", "amount": 100000, "term": "1404/02"},
+    ])
+    assert "برق" in line
+    assert "۱۳" in line or "13" in line  # amount shown (toman)
+
+
+def test_render_bills_line_empty():
+    from energybot.profile.render import render_bills_line
+    assert render_bills_line([]) == ""

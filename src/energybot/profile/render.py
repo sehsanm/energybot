@@ -40,3 +40,19 @@ def render_profile_summary(household: dict, behaviour: dict, goals: list, commit
     if not parts:
         return "هنوز اطلاعاتی از این کاربر در دست نیست."
     return "\n\n".join(parts)
+
+
+def render_bills_line(bills: list[dict]) -> str:
+    if not bills:
+        return ""
+    labels = {"electricity": "برق", "gas": "گاز"}
+    parts = []
+    seen = set()
+    for b in bills:  # newest first
+        kind = b.get("utility_type")
+        if kind in seen:
+            continue
+        seen.add(kind)
+        toman = int(b.get("amount", 0)) // 10
+        parts.append(f"{labels.get(kind, kind)}: {toman:,} تومان")
+    return "آخرین قبض‌ها — " + "، ".join(parts)

@@ -134,9 +134,14 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
             await bale.send_message(chat_id=parsed.chat_id, text="من یک دستیار صرفه‌جویی انرژی هستم. /profile برای دیدن پروفایل، /forget برای فراموش‌کردن من، /restart برای شروع گفتگوی تازه، /bill برای استعلام و پرداخت قبض.")
             return
         if text == "/profile":
-            from energybot.profile.render import render_profile_summary
+            from energybot.profile.render import render_profile_summary, render_bills_line
+            from energybot.billing.repository import BillingRepository
             p = await profile_repo.get(user.id)
             summary = render_profile_summary(p.household or {}, p.behaviour or {}, p.goals or [], p.commitments or [])
+            bills = await BillingRepository(session_factory=session_factory).recent_bills(user.id, limit=6)
+            line = render_bills_line([{"utility_type": b.utility_type, "amount": int(b.amount), "term": b.term} for b in bills])
+            if line:
+                summary = summary + "\n\n" + line
             await bale.send_message(chat_id=parsed.chat_id, text=summary)
             return
         if text == "/restart":
