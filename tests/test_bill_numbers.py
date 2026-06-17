@@ -38,4 +38,9 @@ def test_is_valid_bill_id():
 
 
 def test_utility_type_returns_known_value():
-    assert utility_type_for(VALID_BILL_ID) in {"gas", "electricity", "unknown"}
+    # Branch 1: head "1" → "electricity"
+    assert utility_type_for(VALID_BILL_ID) == "electricity"
+    # Branch 2: head "2" → "gas"
+    assert utility_type_for("2000000000000") == "gas"
+    # Branch 3: head other → "unknown"
+    assert utility_type_for("9000000000000") == "unknown"
