@@ -1,8 +1,7 @@
 import pytest
-from uuid import uuid4
 from sqlalchemy import select
 from energybot.bale_adapter.handler import handle_bale_update
-from energybot.core.models import User, Bill, OnboardingState
+from energybot.core.models import User, Bill
 from energybot.billing.bill_numbers import _check_digit
 
 
@@ -64,3 +63,28 @@ async def test_photo_without_barcode_asks_for_manual(db_session, monkeypatch):
            "photo": [{"file_id": "big"}]}}
     await handle_bale_update(upd, session_factory=lambda: db_session)
     assert any("بارکد" in s["text"] for s in bale.sent)
+
+
+@pytest.mark.asyncio
+async def test_pay_callback_sends_pay_link(db_session, monkeypatch):
+    bale = FakeBale()
+    monkeypatch.setattr("energybot.bale_adapter.handler.get_bale_client", lambda: bale)
+    bale_id = 31003
+    chat_id = 31003
+    u = await _seed_done_user(db_session, bale_id)
+
+    # Step 1: send /bill <valid bill id> to create a Bill row
+    bill_number = _bill_id()
+    upd_bill = {"update_id": 3, "message": {"message_id": 3, "from": {"id": bale_id}, "chat": {"id": chat_id}, "text": f"/bill {bill_number}"}}
+    await handle_bale_update(upd_bill, session_factory=lambda: db_session)
+
+    # Step 2: read the created Bill row to get its UUID
+    bill = (await db_session.execute(select(Bill).where(Bill.user_id == u.id))).scalar_one()
+    bill_db_id = bill.id
+
+    # Step 3: send pay: callback
+    upd_pay = {"update_id": 4, "callback_query": {"id": "cb1", "from": {"id": bale_id}, "message": {"chat": {"id": chat_id}}, "data": f"pay:{bill_db_id}"}}
+    await handle_bale_update(upd_pay, session_factory=lambda: db_session)
+
+    # FakePaymentProvider returns redirect_url = f"https://pay.fake/{bill_id}" where bill_id is the utility bill number
+    assert any("https://pay.fake/" in s["text"] for s in bale.sent)

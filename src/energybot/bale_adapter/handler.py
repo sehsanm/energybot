@@ -154,8 +154,14 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
             if not arg:
                 await bale.send_message(chat_id=parsed.chat_id, text="شناسه قبض را بفرست یا عکس قبض را ارسال کن.")
                 return
-            svc = build_billing_service(session_factory)
-            res = await svc.handle_input(user.id, text=arg)
+            try:
+                svc = build_billing_service(session_factory)
+                res = await svc.handle_input(user.id, text=arg)
+            except Exception:
+                from energybot.logging import get_logger
+                get_logger(__name__).exception("bill_command_failed", chat_id=parsed.chat_id)
+                await bale.send_message(chat_id=parsed.chat_id, text="متأسفم، در پردازش قبض مشکلی پیش اومد. بعداً دوباره امتحان کن.")
+                return
             await _send_capture(bale, parsed.chat_id, res)
             return
 
@@ -202,6 +208,8 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
             try:
                 url = await svc.start_payment(user.id, parsed.chat_id, UUID(parsed.data[4:]))
             except Exception:
+                from energybot.logging import get_logger
+                get_logger(__name__).exception("pay_start_failed", chat_id=parsed.chat_id)
                 await bale.send_message(chat_id=parsed.chat_id, text="ایجاد لینک پرداخت ناموفق بود. بعداً امتحان کن.")
                 return
             await bale.send_message(chat_id=parsed.chat_id, text=f"برای پرداخت روی این لینک بزن:\n{url}")
