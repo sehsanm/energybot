@@ -77,6 +77,12 @@ class BillingRepository:
         await s.refresh(pay)
         return pay
 
+    async def get_subscription_by_id(self, subscription_id: UUID) -> UtilitySubscription | None:
+        s = self._session_factory()
+        return (await s.execute(
+            select(UtilitySubscription).where(UtilitySubscription.id == subscription_id)
+        )).scalar_one_or_none()
+
     async def recent_bills(self, user_id: UUID, limit: int = 12) -> list[Bill]:
         s = self._session_factory()
         return list((await s.execute(
