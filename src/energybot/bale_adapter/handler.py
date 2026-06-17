@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from energybot.bale_adapter.client import BaleClient
 from energybot.bale_adapter.commands import is_command, is_wizard_answer
-from energybot.bale_adapter.parser import parse_update, UpdateText, UpdateCallback, UpdateUnknown
+from energybot.bale_adapter.parser import parse_update, UpdateText, UpdateCallback, UpdatePhoto, UpdateUnknown
 from energybot.core.models import User, Profile
 from energybot.profile.repository import ProfileRepository
 from energybot.profile.wizard import WizardEngine
@@ -67,6 +67,37 @@ def build_agent_for_user(user_id, chat_id, session_factory):
     return _Adapter()
 
 
+def build_billing_service(session_factory):
+    from energybot.billing.service import BillingService
+    from energybot.billing.repository import BillingRepository
+    from energybot.billing.finnotech_client import FinnotechClient
+    from energybot.billing.payment import GenericRedirectProvider, FakePaymentProvider
+    s = get_settings()
+    fin = FinnotechClient(
+        client_id=s.finnotech_client_id, client_secret=s.finnotech_client_secret,
+        national_id=s.finnotech_national_id, scope=s.finnotech_scope,
+        base_url=s.finnotech_base_url, token_path=s.finnotech_token_path,
+        inquiry_path=s.finnotech_inquiry_path,
+    )
+    if s.payment_provider == "generic" and s.payment_gateway_base:
+        payment = GenericRedirectProvider(gateway_base=s.payment_gateway_base, merchant_id=s.payment_merchant_id)
+    else:
+        payment = FakePaymentProvider()
+    return BillingService(
+        finnotech=fin, payment=payment,
+        repo=BillingRepository(session_factory=session_factory),
+        callback_base_url=s.payment_callback_base_url, provider_name=s.payment_provider,
+    )
+
+
+async def _send_capture(bale, chat_id, res):
+    if not res.ok:
+        await bale.send_message(chat_id=chat_id, text=res.error)
+        return
+    markup = {"inline_keyboard": [[{"text": "پرداخت 💳", "callback_data": res.pay_callback}]]}
+    await bale.send_message(chat_id=chat_id, text=res.summary, reply_markup=markup)
+
+
 async def _ensure_user_and_profile(session: AsyncSession, bale_user_id: int, display_name: str | None) -> User:
     u = (await session.execute(select(User).where(User.bale_user_id == bale_user_id))).scalar_one_or_none()
     if u is None:
@@ -97,7 +128,7 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
             await _send_step(bale, parsed.chat_id, step)
             return
         if text == "/help":
-            await bale.send_message(chat_id=parsed.chat_id, text="من یک دستیار صرفه‌جویی انرژی هستم. /profile برای دیدن پروفایل، /forget برای فراموش‌کردن من، /restart برای شروع گفتگوی تازه.")
+            await bale.send_message(chat_id=parsed.chat_id, text="من یک دستیار صرفه‌جویی انرژی هستم. /profile برای دیدن پروفایل، /forget برای فراموش‌کردن من، /restart برای شروع گفتگوی تازه، /bill برای استعلام و پرداخت قبض.")
             return
         if text == "/profile":
             from energybot.profile.render import render_profile_summary
@@ -116,6 +147,16 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
             p.deleted_at = datetime.utcnow()
             await session.commit()
             await bale.send_message(chat_id=parsed.chat_id, text="باشد، اطلاعات شما حذف شد.")
+            return
+
+        if text.startswith("/bill"):
+            arg = text[len("/bill"):].strip()
+            if not arg:
+                await bale.send_message(chat_id=parsed.chat_id, text="شناسه قبض را بفرست یا عکس قبض را ارسال کن.")
+                return
+            svc = build_billing_service(session_factory)
+            res = await svc.handle_input(user.id, text=arg)
+            await _send_capture(bale, parsed.chat_id, res)
             return
 
         current = await wizard.current_step(user.id)
@@ -139,8 +180,32 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
             reply = "متأسفم، یه مشکل فنی پیش اومد. می‌تونی یک بار دیگه تلاش کنی؟"
         await bale.send_message(chat_id=parsed.chat_id, text=reply)
 
+    elif isinstance(parsed, UpdatePhoto):
+        try:
+            file_path = await bale.get_file(parsed.file_id)
+            image_bytes = await bale.download_file(file_path)
+            svc = build_billing_service(session_factory)
+            res = await svc.handle_input(user.id, image_bytes=image_bytes)
+        except Exception:
+            from energybot.logging import get_logger
+            get_logger(__name__).exception("photo_billing_failed", chat_id=parsed.chat_id)
+            await bale.send_message(chat_id=parsed.chat_id, text="نتونستم عکس رو پردازش کنم. دوباره امتحان کن.")
+            return
+        await _send_capture(bale, parsed.chat_id, res)
+        return
+
     elif isinstance(parsed, UpdateCallback):
         await bale.answer_callback_query(callback_query_id=parsed.callback_id)
+        if parsed.data.startswith("pay:"):
+            from uuid import UUID
+            svc = build_billing_service(session_factory)
+            try:
+                url = await svc.start_payment(user.id, parsed.chat_id, UUID(parsed.data[4:]))
+            except Exception:
+                await bale.send_message(chat_id=parsed.chat_id, text="ایجاد لینک پرداخت ناموفق بود. بعداً امتحان کن.")
+                return
+            await bale.send_message(chat_id=parsed.chat_id, text=f"برای پرداخت روی این لینک بزن:\n{url}")
+            return
         current = await wizard.current_step(user.id)
         if current is not None:
             next_step = await wizard.answer(user.id, parsed.data)
