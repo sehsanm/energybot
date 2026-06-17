@@ -24,6 +24,21 @@ class Settings(BaseSettings):
     deepseek_base_url: str = "https://api.deepseek.com/v1"
     deepseek_proxy_url: str | None = None
 
+    # Finnotech billing
+    finnotech_client_id: str = ""
+    finnotech_client_secret: str = ""
+    finnotech_national_id: str = ""  # NID the OAuth client is registered to
+    finnotech_scope: str = "billing:cc-inquiry-detail:get"
+    finnotech_base_url: str = "https://apibeta.finnotech.ir"
+    finnotech_token_path: str = "/dev/v2/oauth2/token"
+    finnotech_inquiry_path: str = "/billing/v2/clients/{client_id}/billInquiry"
+
+    # Payment gateway (redirect)
+    payment_provider: str = "generic"  # generic | finnotech
+    payment_gateway_base: str = ""
+    payment_merchant_id: str = ""
+    payment_callback_base_url: str = ""  # public base, e.g. https://bot.example.ir
+
     session_secret: str = Field(..., min_length=32)
     media_root: str = "/var/lib/energybot/media"
 

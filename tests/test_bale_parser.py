@@ -1,6 +1,6 @@
 import asyncio
 import pytest
-from energybot.bale_adapter.parser import parse_update, UpdateText, UpdateCallback
+from energybot.bale_adapter.parser import parse_update, UpdateText, UpdateCallback, UpdatePhoto
 from energybot.bale_adapter.serialization import PerUserLock
 
 
@@ -20,6 +20,15 @@ def test_parse_callback_query():
     assert isinstance(parsed, UpdateCallback)
     assert parsed.data == "wizard:home_type:آپارتمان"
     assert parsed.callback_id == "cb1"
+
+
+def test_parse_photo_message():
+    upd = {"update_id": 9, "message": {"message_id": 3, "from": {"id": 8, "first_name": "نگار"},
+           "chat": {"id": 8}, "photo": [{"file_id": "small"}, {"file_id": "big"}], "caption": "قبض"}}
+    parsed = parse_update(upd)
+    assert isinstance(parsed, UpdatePhoto)
+    assert parsed.file_id == "big"
+    assert parsed.caption == "قبض"
 
 
 @pytest.mark.asyncio

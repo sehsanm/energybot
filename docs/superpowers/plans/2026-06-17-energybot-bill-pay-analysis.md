@@ -1286,8 +1286,10 @@ class BillingService:
         if bill is None:
             raise ValueError("bill not found")
         return_url = f"{self._callback_base}/pay/callback"
+        # bill_id here is the gateway-facing identifier used only in the payment
+        # description/metadata; the pay_id (شناسه‌پرداخت) is the meaningful value.
         session = await self._pay.create_session(
-            amount=int(bill.amount), bill_id=bill.subscription_id and "" or "",
+            amount=int(bill.amount), bill_id=(bill.pay_id or str(bill.id)),
             pay_id=bill.pay_id, return_url=return_url)
         await self._repo.create_payment(
             user_id, bill_db_id=bill.id, chat_id=chat_id, provider=self._provider_name,

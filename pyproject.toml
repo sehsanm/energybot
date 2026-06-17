@@ -20,6 +20,8 @@ dependencies = [
   "apscheduler>=3.10",
   "structlog>=24.1",
   "prometheus-client>=0.20",
+  "pyzbar>=0.1.9",
+  "Pillow>=10.0",
 ]
 
 [project.optional-dependencies]
