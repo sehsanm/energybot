@@ -48,10 +48,7 @@ class BillingService:
 
     def _capture_numbers(self, *, image_bytes: bytes | None, text: str | None) -> BillNumbers | None:
         if image_bytes is not None:
-            bn = decode_bill_barcode(image_bytes)
-            if bn is not None:
-                return bn
-            return None
+            return decode_bill_barcode(image_bytes)
         if text:
             try:
                 return parse_bill_numbers(text)
@@ -79,17 +76,17 @@ class BillingService:
         )
 
     async def start_payment(self, user_id: UUID, chat_id: int, bill_db_id: UUID) -> str:
-        bills = await self._repo.recent_bills(user_id)
-        bill = next((b for b in bills if b.id == bill_db_id), None)
+        bill = await self._repo.get_bill_by_id(bill_db_id)
         if bill is None:
             raise ValueError("bill not found")
         sub = await self._repo.get_subscription_by_id(bill.subscription_id)
+        if sub is None:
+            raise ValueError("subscription not found")
         return_url = f"{self._callback_base}/pay/callback"
         # bill_id here is the gateway-facing identifier used only in the payment
         # description/metadata; the pay_id (شناسه‌پرداخت) is the meaningful value.
-        cosmetic_bill_id = (sub.bill_id if sub else None) or str(bill.id)
         session = await self._pay.create_session(
-            amount=int(bill.amount), bill_id=cosmetic_bill_id,
+            amount=int(bill.amount), bill_id=sub.bill_id,
             pay_id=bill.pay_id, return_url=return_url)
         await self._repo.create_payment(
             user_id, bill_db_id=bill.id, chat_id=chat_id, provider=self._provider_name,

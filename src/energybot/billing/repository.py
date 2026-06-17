@@ -83,6 +83,12 @@ class BillingRepository:
             select(UtilitySubscription).where(UtilitySubscription.id == subscription_id)
         )).scalar_one_or_none()
 
+    async def get_bill_by_id(self, bill_id: UUID) -> Bill | None:
+        s = self._session_factory()
+        return (await s.execute(
+            select(Bill).where(Bill.id == bill_id)
+        )).scalar_one_or_none()
+
     async def recent_bills(self, user_id: UUID, limit: int = 12) -> list[Bill]:
         s = self._session_factory()
         return list((await s.execute(

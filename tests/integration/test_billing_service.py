@@ -3,7 +3,7 @@ from uuid import uuid4
 from energybot.core.models import User, Profile, Bill
 from sqlalchemy import select
 from energybot.billing.repository import BillingRepository
-from energybot.billing.finnotech_client import FakeFinnotechClient, BillDetail
+from energybot.billing.finnotech_client import FakeFinnotechClient
 from energybot.billing.payment import FakePaymentProvider
 from energybot.billing.service import BillingService
 from energybot.billing.bill_numbers import _check_digit
