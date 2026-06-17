@@ -34,6 +34,8 @@ def build_agent_for_user(user_id, chat_id, session_factory):
     from energybot.agent.tools.record_commitment import RecordCommitmentTool
     from energybot.agent.tools.search_kb import SearchKBTool
     from energybot.agent.tools.send_kb_media import SendKBMediaTool
+    from energybot.agent.tools.read_bills import ReadBillsTool
+    from energybot.billing.repository import BillingRepository
     from energybot.chat.repository import ChatRepository
     from energybot.kb.retrieval import RetrievalService
     from energybot.providers.factory import build_providers
@@ -52,6 +54,7 @@ def build_agent_for_user(user_id, chat_id, session_factory):
     registry.register(RecordCommitmentTool(repo=profile_repo, user_id=user_id, current_message_id=None))
     registry.register(SearchKBTool(retrieval=retrieval))
     registry.register(SendKBMediaTool(bale=get_bale_client(), session_factory=session_factory, chat_id=chat_id))
+    registry.register(ReadBillsTool(repo=BillingRepository(session_factory=session_factory), user_id=user_id))
 
     class _Adapter:
         async def handle(self_inner, user_id, chat_id, text):
