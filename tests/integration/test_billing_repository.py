@@ -73,6 +73,22 @@ async def test_mark_payment_failure_leaves_bill_unchanged(db_session):
 
 
 @pytest.mark.asyncio
+async def test_recent_bills_excludes_soft_deleted_user(db_session):
+    u = await _user(db_session)
+    repo = BillingRepository(session_factory=lambda: db_session)
+    sub = await repo.get_or_create_subscription(u.id, utility_type="electricity", bill_id="117709580013")
+    await repo.add_bill(u.id, sub.id, _detail())
+    # Bill is visible before soft-delete
+    assert len(await repo.recent_bills(u.id)) == 1
+    # Soft-delete the user
+    user_row = await db_session.get(User, u.id)
+    user_row.deleted_at = datetime.utcnow()
+    await db_session.commit()
+    # Bill must no longer be surfaced
+    assert await repo.recent_bills(u.id) == []
+
+
+@pytest.mark.asyncio
 async def test_recent_bills_orders_desc(db_session):
     u = await _user(db_session)
     repo = BillingRepository(session_factory=lambda: db_session)

@@ -3,7 +3,7 @@ from datetime import datetime
 from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from energybot.core.models import UtilitySubscription, Bill, BillPayment
+from energybot.core.models import User, UtilitySubscription, Bill, BillPayment
 from energybot.billing.finnotech_client import BillDetail
 from energybot.billing.payment import PaymentSession
 
@@ -92,5 +92,8 @@ class BillingRepository:
     async def recent_bills(self, user_id: UUID, limit: int = 12) -> list[Bill]:
         s = self._session_factory()
         return list((await s.execute(
-            select(Bill).where(Bill.user_id == user_id).order_by(Bill.inquired_at.desc()).limit(limit)
+            select(Bill).join(User, User.id == Bill.user_id)
+            .where(Bill.user_id == user_id, User.deleted_at.is_(None))
+            .order_by(Bill.inquired_at.desc(), Bill.id.desc())
+            .limit(limit)
         )).scalars().all())

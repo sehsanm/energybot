@@ -62,12 +62,12 @@ class FinnotechClient:
         except httpx.HTTPError as e:
             raise FinnotechError(f"token request failed: {e}") from e
         if r.status_code >= 400:
-            raise FinnotechError(f"token http {r.status_code}: {r.text}")
+            raise FinnotechError(f"token http {r.status_code}")
         data = r.json()
         result = data.get("result") or {}
         token = result.get("value")
         if not token:
-            raise FinnotechError(f"no token in response: {data}")
+            raise FinnotechError("no token in response")
         life_ms = int(result.get("lifeTime", 3600000))
         self._token = token
         self._token_expiry = time.monotonic() + life_ms / 1000.0
@@ -85,10 +85,10 @@ class FinnotechClient:
         except httpx.HTTPError as e:
             raise FinnotechError(f"inquiry request failed: {e}") from e
         if r.status_code >= 400:
-            raise FinnotechError(f"inquiry http {r.status_code}: {r.text}")
+            raise FinnotechError(f"inquiry http {r.status_code}")
         data: dict[str, Any] = r.json()
         if str(data.get("status", "")).upper() not in ("DONE", "OK", "SUCCESS"):
-            raise FinnotechError(f"inquiry failed: {data.get('error') or data}")
+            raise FinnotechError(f"inquiry failed: status={data.get('status')} code={(data.get('error') or {}).get('code')}")
         result = data.get("result") or {}
         amount_raw = result.get("amount") or result.get("billAmount") or 0
         return BillDetail(
