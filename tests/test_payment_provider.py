@@ -26,6 +26,26 @@ async def test_generic_verify_success():
 
 
 @pytest.mark.asyncio
+async def test_generic_verify_fails_on_http_error():
+    def handler(request):
+        return httpx.Response(500, text="boom")
+    p = GenericRedirectProvider(gateway_base="https://pay.test", merchant_id="M1",
+                                transport=httpx.MockTransport(handler))
+    res = await p.verify(gateway_ref="AUTH123", params={"Status": "OK"})
+    assert res.success is False
+
+
+@pytest.mark.asyncio
+async def test_generic_verify_fails_on_bad_status():
+    def handler(request):
+        return httpx.Response(200, json={"status": 1, "refId": "R9"})
+    p = GenericRedirectProvider(gateway_base="https://pay.test", merchant_id="M1",
+                                transport=httpx.MockTransport(handler))
+    res = await p.verify(gateway_ref="AUTH123", params={"Status": "OK"})
+    assert res.success is False
+
+
+@pytest.mark.asyncio
 async def test_fake_provider_roundtrip():
     p = FakePaymentProvider()
     sess = await p.create_session(amount=1, bill_id="b", pay_id=None, return_url="r")
