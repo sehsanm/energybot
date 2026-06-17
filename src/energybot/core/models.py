@@ -250,3 +250,48 @@ class DailyStats(Base):
     kb_hits: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     llm_cost_usd: Mapped[float] = mapped_column(Numeric(10, 4), default=0, nullable=False)
     tokens_total: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+
+
+class UtilitySubscription(Base):
+    __tablename__ = "utility_subscriptions"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    utility_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    bill_id: Mapped[str] = mapped_column(String(20), nullable=False)
+    label: Mapped[str | None] = mapped_column(String(200))
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
+    deleted_at: Mapped[datetime | None] = mapped_column()
+    __table_args__ = (UniqueConstraint("user_id", "bill_id", name="uq_subscription_user_bill"),)
+
+
+class Bill(Base):
+    __tablename__ = "bills"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    subscription_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("utility_subscriptions.id", ondelete="CASCADE"), nullable=False)
+    utility_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    pay_id: Mapped[str | None] = mapped_column(String(20))
+    amount: Mapped[int] = mapped_column(Numeric(14, 0), nullable=False)
+    term: Mapped[str | None] = mapped_column(String(40))
+    consumption: Mapped[float | None] = mapped_column(Numeric(14, 2))
+    due_date: Mapped[_date | None] = mapped_column(Date)
+    status: Mapped[str] = mapped_column(String(20), default="inquired", nullable=False)
+    raw_inquiry: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    inquired_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
+    __table_args__ = (Index("ix_bills_user_inquired", "user_id", "inquired_at"),)
+
+
+class BillPayment(Base):
+    __tablename__ = "bill_payments"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    bill_db_id: Mapped[UUID] = mapped_column("bill_id", PGUUID(as_uuid=True), ForeignKey("bills.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    provider: Mapped[str] = mapped_column(String(40), nullable=False)
+    amount: Mapped[int] = mapped_column(Numeric(14, 0), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
+    gateway_ref: Mapped[str | None] = mapped_column(String(120), index=True)
+    redirect_url: Mapped[str | None] = mapped_column(Text)
+    raw: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
+    paid_at: Mapped[datetime | None] = mapped_column()
