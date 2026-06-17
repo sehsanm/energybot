@@ -38,3 +38,17 @@ async def test_send_photo_uploads_file_when_no_id(tmp_path):
     c = BaleClient(token="T", base_url="https://tapi.bale.ai", transport=httpx.MockTransport(handler))
     fid = await c.send_photo(chat_id=5, file_id=None, file_path=str(f), caption=None)
     assert fid == "RETURNED"
+
+
+@pytest.mark.asyncio
+async def test_get_file_and_download():
+    def handler(request):
+        if request.url.path.endswith("/getFile"):
+            return httpx.Response(200, json={"ok": True, "result": {"file_path": "photos/x.jpg"}})
+        assert request.url.path.endswith("/file/botT/photos/x.jpg")
+        return httpx.Response(200, content=b"IMGBYTES")
+    c = BaleClient(token="T", base_url="https://tapi.bale.ai", transport=httpx.MockTransport(handler))
+    fp = await c.get_file("FID")
+    assert fp == "photos/x.jpg"
+    data = await c.download_file(fp)
+    assert data == b"IMGBYTES"

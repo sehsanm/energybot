@@ -62,3 +62,13 @@ class BaleClient:
         r.raise_for_status()
         v = r.json().get("result", {}).get("video", {})
         return v.get("file_id")
+
+    async def get_file(self, file_id: str) -> str:
+        data = await self._post_json("getFile", {"file_id": file_id})
+        return data["result"]["file_path"]
+
+    async def download_file(self, file_path: str) -> bytes:
+        url = f"{self._base}/file/bot{self._token}/{file_path}"
+        r = await self._client.get(url)
+        r.raise_for_status()
+        return r.content
