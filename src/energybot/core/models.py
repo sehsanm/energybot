@@ -218,7 +218,7 @@ class AuditLog(Base):
 
 
 from datetime import date as _date
-from sqlalchemy import Date, Numeric
+from sqlalchemy import Date, Numeric, text
 
 
 class LLMCall(Base):
@@ -275,7 +275,7 @@ class Bill(Base):
     term: Mapped[str | None] = mapped_column(String(40))
     consumption: Mapped[float | None] = mapped_column(Numeric(14, 2))
     due_date: Mapped[_date | None] = mapped_column(Date)
-    status: Mapped[str] = mapped_column(String(20), default="inquired", nullable=False)
+    status: Mapped[str] = mapped_column(String(20), server_default=text("'inquired'"), nullable=False)
     raw_inquiry: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
     inquired_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
     __table_args__ = (Index("ix_bills_user_inquired", "user_id", "inquired_at"),)
@@ -289,7 +289,7 @@ class BillPayment(Base):
     chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     provider: Mapped[str] = mapped_column(String(40), nullable=False)
     amount: Mapped[int] = mapped_column(Numeric(14, 0), nullable=False)
-    status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
+    status: Mapped[str] = mapped_column(String(20), server_default=text("'pending'"), nullable=False)
     gateway_ref: Mapped[str | None] = mapped_column(String(120), index=True)
     redirect_url: Mapped[str | None] = mapped_column(Text)
     raw: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
