@@ -43,6 +43,23 @@ STEPS: list[_StepDef] = [
 ]
 
 _STEP_BY_KEY: dict[str, _StepDef] = {s.key: s for s in STEPS}
+_STEP_BY_PATH: dict[str, _StepDef] = {s.profile_path: s for s in STEPS}
+
+
+def household_field_schema() -> list[dict]:
+    return [
+        {"key": s.key, "label": s.prompt, "options": s.buttons, "path": s.profile_path}
+        for s in STEPS
+    ]
+
+
+def normalize_household_value(path: str, value: str):
+    step = _STEP_BY_PATH.get(path)
+    if step is None:
+        raise KeyError(path)
+    if step.buttons is not None and str(value) not in step.buttons:
+        raise ValueError(f"invalid option for {path}: {value!r}")
+    return step.parse(str(value))
 
 
 class WizardEngine:
