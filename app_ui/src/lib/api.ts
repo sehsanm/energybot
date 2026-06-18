@@ -99,3 +99,30 @@ export async function payBill(billDbId: string): Promise<string> {
   if (!r.ok) throw new Error(String(r.status));
   return (await r.json()).url;
 }
+
+export type ProfileField = { key: string; label: string; options: string[] | null; path: string };
+export type ProfileData = {
+  household: Record<string, unknown>; behaviour: Record<string, unknown>;
+  goals: string[]; commitments: string[]; completeness_score: number; fields: ProfileField[];
+};
+
+export async function getProfile(): Promise<ProfileData> {
+  const r = await req("/profile");
+  if (!r.ok) throw new Error(String(r.status));
+  return r.json();
+}
+export async function patchProfile(path: string, value: string): Promise<ProfileData> {
+  const r = await req("/profile", { method: "PATCH", body: JSON.stringify({ path, value }) });
+  if (!r.ok) throw new Error(String(r.status));
+  return r.json();
+}
+export async function addProfileItem(section: "goals" | "commitments", text: string): Promise<ProfileData> {
+  const r = await req(`/profile/${section}`, { method: "POST", body: JSON.stringify({ text }) });
+  if (!r.ok) throw new Error(String(r.status));
+  return r.json();
+}
+export async function removeProfileItem(section: "goals" | "commitments", index: number): Promise<ProfileData> {
+  const r = await req(`/profile/${section}/${index}`, { method: "DELETE" });
+  if (!r.ok) throw new Error(String(r.status));
+  return r.json();
+}
