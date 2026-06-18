@@ -17,7 +17,7 @@ class FakeBale:
 
 
 class FakeAgent:
-    async def handle(self, user_id, chat_id, text): return "پاسخ دستیار: " + text
+    async def handle(self, text): return "پاسخ دستیار: " + text
 
 
 @pytest.mark.asyncio
