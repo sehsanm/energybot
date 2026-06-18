@@ -31,16 +31,16 @@ export default function ChatPage() {
     setInput("");
     setBusy(true);
     setBubbles((b) => [...b, { kind: "text", role: "user", content: text }]);
-    let assistantIndex = -1;
     await streamChat(text, {
       onStatus: (t) => setStatus(t),
       onMedia: (m) => setBubbles((b) => [...b, { kind: "media", url: m.url, mediaType: m.media_type, caption: m.caption }]),
       onChunk: (t) => setBubbles((b) => {
         setStatus(null);
-        const copy = [...b];
-        if (assistantIndex === -1) { assistantIndex = copy.length; copy.push({ kind: "text", role: "assistant", content: t }); }
-        else { const cur = copy[assistantIndex] as Extract<Bubble, { kind: "text" }>; copy[assistantIndex] = { ...cur, content: cur.content + t }; }
-        return copy;
+        const last = b[b.length - 1];
+        if (last && last.kind === "text" && last.role === "assistant") {
+          return [...b.slice(0, -1), { ...last, content: last.content + t }];
+        }
+        return [...b, { kind: "text", role: "assistant", content: t }];
       }),
       onDone: () => { setStatus(null); setBusy(false); },
       onError: (t) => { setStatus(null); setBusy(false); setBubbles((b) => [...b, { kind: "error", content: t }]); },
@@ -50,10 +50,9 @@ export default function ChatPage() {
   async function loadOlder() {
     if (oldestId == null) return;
     const older = await getHistory(oldestId);
-    if (older.length) {
-      setBubbles((b) => [...older.map((m) => ({ kind: "text", role: m.role, content: m.content } as Bubble)), ...b]);
-      setOldestId(older[0].id);
-    }
+    if (!older.length) { setOldestId(null); return; }
+    setBubbles((b) => [...older.map((m) => ({ kind: "text", role: m.role, content: m.content } as Bubble)), ...b]);
+    setOldestId(older[0].id);
   }
 
   return (
