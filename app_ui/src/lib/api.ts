@@ -139,3 +139,15 @@ export async function getSessionMessages(id: string): Promise<ChatMsg[]> {
   if (!r.ok) throw new Error(String(r.status));
   return (await r.json()).messages;
 }
+
+export type DashboardData = {
+  completeness_score: number;
+  latest_bill: { id: string; utility_type: string; amount: number; term: string | null; due_date: string | null; status: string } | null;
+  trend: { term: string | null; consumption: number; utility_type: string }[];
+};
+
+export async function getDashboard(): Promise<DashboardData> {
+  const r = await req("/dashboard");
+  if (!r.ok) throw new Error(String(r.status));
+  return r.json();
+}

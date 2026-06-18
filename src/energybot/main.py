@@ -20,6 +20,7 @@ from energybot.user_api.auth import router as user_auth_router
 from energybot.user_api.chat import router as user_chat_router
 from energybot.user_api.bills import router as user_bills_router
 from energybot.user_api.profile import router as user_profile_router
+from energybot.user_api.dashboard import router as user_dashboard_router
 from energybot.logging import configure_logging, get_logger
 from energybot.jobs.scheduler import make_scheduler
 from energybot.metrics import router as metrics_router
@@ -106,6 +107,7 @@ def create_app() -> FastAPI:
     app.include_router(user_chat_router)
     app.include_router(user_bills_router)
     app.include_router(user_profile_router)
+    app.include_router(user_dashboard_router)
     app.include_router(metrics_router)
     app.include_router(pay_router)
     static_dir = os.environ.get("ENERGYBOT_ADMIN_STATIC_DIR", "admin_ui/out")
