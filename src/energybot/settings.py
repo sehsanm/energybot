@@ -46,6 +46,8 @@ class Settings(BaseSettings):
     tool_iteration_cap: int = 6
     session_idle_minutes: int = 30
     web_login_token_ttl_minutes: int = 5
+    web_chat_chunk_chars: int = 3
+    web_chat_chunk_delay_ms: int = 12
     user_session_days: int = 30
     public_base_url: str = ""
     soft_delete_grace_days: int = 30
