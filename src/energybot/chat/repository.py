@@ -71,3 +71,23 @@ class ChatRepository:
             .order_by(Message.id)
         )).scalars().all()
         return list(rows)
+
+    async def history_page(self, user_id: UUID, *, before: int | None = None, limit: int = 30) -> list[Message]:
+        s = self._session_factory()
+        q = (
+            select(Message)
+            .where(Message.user_id == user_id, Message.role.in_(("user", "assistant")), Message.deleted_at.is_(None))
+        )
+        if before is not None:
+            q = q.where(Message.id < before)
+        q = q.order_by(desc(Message.id)).limit(limit)
+        rows = (await s.execute(q)).scalars().all()
+        return list(reversed(rows))
+
+    async def latest_assistant_message_id(self, user_id: UUID) -> int | None:
+        s = self._session_factory()
+        return (await s.execute(
+            select(Message.id)
+            .where(Message.user_id == user_id, Message.role == "assistant", Message.deleted_at.is_(None))
+            .order_by(desc(Message.id)).limit(1)
+        )).scalar_one_or_none()

@@ -10,7 +10,7 @@ from energybot.providers.base import ChatMessage, ChatRequest
 class AgentLoop:
     def __init__(self, *, router, context_assembler: ContextAssembler, chat_repo: ChatRepository,
                  tool_registry: ToolRegistry, summarizer, tool_iteration_cap: int,
-                 user_id: UUID, chat_id: int):
+                 user_id: UUID):
         self._router = router
         self._asm = context_assembler
         self._chat = chat_repo
@@ -18,7 +18,6 @@ class AgentLoop:
         self._summ = summarizer
         self._cap = tool_iteration_cap
         self._user_id = user_id
-        self._chat_id = chat_id
 
     async def handle_message(self, user_text: str) -> str:
         sid = await self._chat.session_for(self._user_id)

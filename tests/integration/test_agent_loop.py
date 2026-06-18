@@ -41,7 +41,7 @@ async def test_simple_turn_no_tools(db_session):
                            chat_repo=ChatRepository(session_factory=lambda: db_session))
     router = FakeRouter([ChatResponse(content="درود", tokens_in=10, tokens_out=2, finish_reason="stop")])
     loop = AgentLoop(router=router, context_assembler=asm, chat_repo=ChatRepository(session_factory=lambda: db_session),
-                     tool_registry=ToolRegistry(), summarizer=None, tool_iteration_cap=6, user_id=u.id, chat_id=999)
+                     tool_registry=ToolRegistry(), summarizer=None, tool_iteration_cap=6, user_id=u.id)
     reply = await loop.handle_message("سلام")
     assert reply == "درود"
 
@@ -69,7 +69,7 @@ async def test_tool_iteration_cap(db_session):
     registry.register(DummyRead())
 
     loop = AgentLoop(router=router, context_assembler=asm, chat_repo=ChatRepository(session_factory=lambda: db_session),
-                     tool_registry=registry, summarizer=None, tool_iteration_cap=6, user_id=u.id, chat_id=999)
+                     tool_registry=registry, summarizer=None, tool_iteration_cap=6, user_id=u.id)
     reply = await loop.handle_message("ببین چی")
     assert reply == "پاسخ نهایی"
     assert router.calls == 7
