@@ -52,7 +52,7 @@ export default function ProfilePage() {
                   {f.options.map((o) => <option key={o} value={o}>{o}</option>)}
                 </select>
               ) : (
-                <input defaultValue={fieldValue(p, f.key)} onBlur={(e) => { if (e.target.value.trim()) save(f.path, e.target.value.trim()); }}
+                <input key={`${f.key}-${fieldValue(p, f.key)}`} defaultValue={fieldValue(p, f.key)} onBlur={(e) => { if (e.target.value.trim()) save(f.path, e.target.value.trim()); }}
                   className="w-full rounded-md border px-3 py-2" />
               )}
             </label>
@@ -98,7 +98,7 @@ function ChipSection(props: {
       <div className="flex gap-2">
         <input value={props.value} onChange={(e) => props.setValue(e.target.value)} placeholder="افزودن…"
           className="flex-1 rounded-md border px-3 py-2 text-sm" />
-        <button onClick={async () => { const t = props.value.trim(); if (t) { await props.onAdd(t).catch(() => {}); props.setValue(""); } }}
+        <button onClick={async () => { const t = props.value.trim(); if (!t) return; try { await props.onAdd(t); props.setValue(""); } catch { /* keep typed text so the user can retry */ } }}
           className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground">افزودن</button>
       </div>
     </section>
