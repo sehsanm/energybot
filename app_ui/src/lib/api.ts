@@ -126,3 +126,16 @@ export async function removeProfileItem(section: "goals" | "commitments", index:
   if (!r.ok) throw new Error(String(r.status));
   return r.json();
 }
+
+export type SessionRow = { id: string; started_at: string; ended_at: string | null; message_count: number; snippet: string };
+
+export async function getSessions(): Promise<SessionRow[]> {
+  const r = await req("/chat/sessions");
+  if (!r.ok) throw new Error(String(r.status));
+  return (await r.json()).sessions;
+}
+export async function getSessionMessages(id: string): Promise<ChatMsg[]> {
+  const r = await req(`/chat/sessions/${id}`);
+  if (!r.ok) throw new Error(String(r.status));
+  return (await r.json()).messages;
+}
