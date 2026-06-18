@@ -118,6 +118,11 @@ async def test_history_endpoint_returns_messages(app, db_session, monkeypatch):
     def fake_build_agent(*, user_id, channel, session_factory):
         class _A:
             async def handle(self, text):
+                from energybot.chat.repository import ChatRepository
+                repo = ChatRepository(session_factory=session_factory)
+                sid = await repo.session_for(user_id)
+                await repo.add_message(user_id, sid, role="user", content=text)
+                await repo.add_message(user_id, sid, role="assistant", content="پاسخ")
                 return "پاسخ"
         return _A()
     monkeypatch.setattr(chat_mod, "build_agent", fake_build_agent)

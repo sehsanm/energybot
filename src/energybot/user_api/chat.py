@@ -57,11 +57,8 @@ async def chat(payload: ChatIn, user: User = Depends(current_user)):
         yield _sse("status", {"text": "در حال فکر کردن…"})
         web = WebChannel()
         try:
-            sid = await chat_repo.session_for(user.id)
-            await chat_repo.add_message(user.id, sid, role="user", content=text)
             agent = build_agent(user_id=user.id, channel=web, session_factory=sf)
             final = await agent.handle(text)
-            await chat_repo.add_message(user.id, sid, role="assistant", content=final)
         except Exception:
             get_logger(__name__).exception("web_chat_failed", user_id=str(user.id))
             yield _sse("error", {"text": _FALLBACK})
