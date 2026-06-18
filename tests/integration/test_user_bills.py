@@ -2,6 +2,9 @@ import os
 import pytest
 from energybot.core.models import User, UtilitySubscription
 from energybot.billing.repository import BillingRepository
+from httpx import ASGITransport, AsyncClient
+from energybot.user_api.tokens import mint_login_token
+from energybot.billing.service import CaptureResult
 
 TEST_DB = os.environ.get(
     "TEST_DATABASE_URL",
@@ -39,3 +42,82 @@ async def test_list_subscriptions_excludes_deleted_newest_first(db_session):
     assert "C" not in labels
     assert set(labels) == {"A", "B"}
     assert subs[0].label == "B"  # newest first (created after A)
+
+
+@pytest.fixture
+async def app(monkeypatch, db_session):
+    for k, v in dict(DATABASE_URL=TEST_DB, SESSION_SECRET="z" * 32, BALE_WEBHOOK_SECRET="x",
+                     BALE_BOT_TOKEN="t", FRONTIER_API_KEY="f", METIS_API_KEY="m").items():
+        monkeypatch.setenv(k, v)
+    from energybot.settings import get_settings
+    get_settings.cache_clear()
+    import energybot.core.db as _db
+    _db._engine = None
+    _db._sessionmaker = None
+    import energybot.user_api.auth as _uauth
+    _uauth._REDEEM_HITS.clear()
+    from energybot.main import create_app
+    return create_app()
+
+
+async def _login(client, db_session, bale_user_id):
+    u = User(bale_user_id=bale_user_id)
+    db_session.add(u)
+    await db_session.flush()
+    raw = await mint_login_token(db_session, u.id, ttl_minutes=5)
+    r = await client.post("/api/app/auth/redeem", json={"t": raw})
+    return u, r.headers["x-csrf"]
+
+
+@pytest.mark.asyncio
+async def test_get_bills_shape(app, db_session):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+        u, _ = await _login(c, db_session, 602602)
+        db_session.add(UtilitySubscription(user_id=u.id, utility_type="electricity", bill_id="111", label="خانه"))
+        await db_session.commit()
+        r = await c.get("/api/app/bills")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["subscriptions"][0]["label"] == "خانه"
+    assert "bills" in body
+
+
+@pytest.mark.asyncio
+async def test_inquire_uses_billing_service(app, db_session, monkeypatch):
+    import energybot.user_api.bills as bills_mod
+
+    class _FakeSvc:
+        async def handle_input(self, user_id, *, text=None, image_bytes=None):
+            return CaptureResult(ok=True, summary="📄 قبض برق", pay_callback="pay:abc",
+                                 bill_db_id="abc-123", error=None)
+    monkeypatch.setattr(bills_mod, "build_billing_service", lambda sf: _FakeSvc())
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+        u, csrf = await _login(c, db_session, 603603)
+        r = await c.post("/api/app/bills/inquire", json={"bill_id": "12345"}, headers={"x-csrf": csrf})
+    assert r.status_code == 200
+    assert r.json() == {"ok": True, "summary": "📄 قبض برق", "bill_db_id": "abc-123", "error": None}
+
+
+@pytest.mark.asyncio
+async def test_pay_passes_bale_user_id_as_chat_id(app, db_session, monkeypatch):
+    import energybot.user_api.bills as bills_mod
+    seen = {}
+
+    class _FakeSvc:
+        async def start_payment(self, user_id, chat_id, bill_db_id):
+            seen["chat_id"] = chat_id
+            return "https://gw.example/pay/xyz"
+    monkeypatch.setattr(bills_mod, "build_billing_service", lambda sf: _FakeSvc())
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+        u, csrf = await _login(c, db_session, 604604)
+        r = await c.post("/api/app/bills/00000000-0000-0000-0000-0000000000ab/pay", headers={"x-csrf": csrf})
+    assert r.status_code == 200
+    assert r.json()["url"] == "https://gw.example/pay/xyz"
+    assert seen["chat_id"] == 604604  # == bale_user_id
+
+
+@pytest.mark.asyncio
+async def test_bills_requires_auth(app):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+        r = await c.get("/api/app/bills")
+    assert r.status_code == 401
