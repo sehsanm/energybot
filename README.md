@@ -14,6 +14,7 @@ Persian-language energy-saving assistant on Bale messenger.
 6. Seed initial admin: `python -m energybot.admin_cli create-user --email you@x.com --role admin`
 7. Build admin UI: `cd admin_ui && npm install && npm run build && cd ..`
 8. Build landing UI: `cd landing_ui && npm install && npm run build && cd ..`
+8b. Build user app UI: `cd app_ui && npm install && npm run build && cd ..`
 9. Run: `uvicorn energybot.main:app --reload`
 10. Open `http://localhost:8000/` (landing) or `http://localhost:8000/admin/` (admin).
 
