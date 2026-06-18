@@ -295,3 +295,25 @@ class BillPayment(Base):
     raw: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
     paid_at: Mapped[datetime | None] = mapped_column()
+
+
+class WebLoginToken(Base):
+    __tablename__ = "web_login_tokens"
+    token_hash: Mapped[str] = mapped_column(String(128), primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    expires_at: Mapped[datetime] = mapped_column(nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column()
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
+
+
+class UserSession(Base):
+    __tablename__ = "user_sessions"
+    id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    issued_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
+    last_seen_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(nullable=False)
