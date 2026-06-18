@@ -62,7 +62,12 @@ async def pay(bill_db_id: str, user: User = Depends(current_user)):
         raise HTTPException(status_code=404, detail="not found")
     Session = get_sessionmaker()
     async with Session() as session:
-        svc = build_billing_service(lambda: session)
+        sf = lambda: session
+        repo = BillingRepository(session_factory=sf)
+        bill = await repo.get_bill_by_id(bid)
+        if bill is None or bill.user_id != user.id:
+            raise HTTPException(status_code=404, detail="قبض یافت نشد.")
+        svc = build_billing_service(sf)
         try:
             url = await svc.start_payment(user.id, user.bale_user_id, bid)
         except ValueError:

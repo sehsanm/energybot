@@ -1,6 +1,6 @@
 import os
 import pytest
-from energybot.core.models import User, UtilitySubscription
+from energybot.core.models import User, UtilitySubscription, Bill
 from energybot.billing.repository import BillingRepository
 from httpx import ASGITransport, AsyncClient
 from energybot.user_api.tokens import mint_login_token
@@ -110,10 +110,44 @@ async def test_pay_passes_bale_user_id_as_chat_id(app, db_session, monkeypatch):
     monkeypatch.setattr(bills_mod, "build_billing_service", lambda sf: _FakeSvc())
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
         u, csrf = await _login(c, db_session, 604604)
-        r = await c.post("/api/app/bills/00000000-0000-0000-0000-0000000000ab/pay", headers={"x-csrf": csrf})
+        # Create a real bill owned by user A so the ownership check passes
+        sub = UtilitySubscription(user_id=u.id, utility_type="electricity", bill_id="604", label="خانه")
+        db_session.add(sub)
+        await db_session.flush()
+        bill = Bill(user_id=u.id, subscription_id=sub.id, utility_type="electricity", amount=50000, term="1402")
+        db_session.add(bill)
+        await db_session.commit()
+        r = await c.post(f"/api/app/bills/{bill.id}/pay", headers={"x-csrf": csrf})
     assert r.status_code == 200
     assert r.json()["url"] == "https://gw.example/pay/xyz"
     assert seen["chat_id"] == 604604  # == bale_user_id
+
+
+@pytest.mark.asyncio
+async def test_pay_rejects_other_users_bill(app, db_session):
+    """IDOR: user A cannot pay user B's bill — ownership check fires before payment provider."""
+    # Create user B with a real bill in the DB
+    user_b = User(bale_user_id=605605)
+    db_session.add(user_b)
+    await db_session.flush()
+    sub_b = UtilitySubscription(user_id=user_b.id, utility_type="electricity", bill_id="999", label="B's home")
+    db_session.add(sub_b)
+    await db_session.flush()
+    bill_b = Bill(
+        user_id=user_b.id,
+        subscription_id=sub_b.id,
+        utility_type="electricity",
+        amount=100000,
+        term="1402",
+    )
+    db_session.add(bill_b)
+    await db_session.commit()
+
+    # Log in as user A and try to pay user B's bill
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+        _user_a, csrf = await _login(c, db_session, 606606)
+        r = await c.post(f"/api/app/bills/{bill_b.id}/pay", headers={"x-csrf": csrf})
+    assert r.status_code == 404
 
 
 @pytest.mark.asyncio
