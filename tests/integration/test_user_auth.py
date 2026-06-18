@@ -130,11 +130,30 @@ async def test_me_returns_user_after_redeem(app, db_session):
 async def test_blocked_user_rejected(app, db_session):
     from sqlalchemy import update
     raw = await _mint_for(db_session, 77777)
-    from energybot.core.models import User as U
-    await db_session.execute(update(U).where(U.bale_user_id == 77777).values(is_blocked=True))
-    await db_session.commit()
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
-        await c.post("/api/app/auth/redeem", json={"t": raw})
+        r_redeem = await c.post("/api/app/auth/redeem", json={"t": raw})
+        assert r_redeem.status_code == 200, "redeem must succeed before blocking"
+        # Now block the user in the DB so current_user sees it
+        from energybot.core.models import User as U
+        await db_session.execute(update(U).where(U.bale_user_id == 77777).values(is_blocked=True))
+        await db_session.commit()
+        r = await c.get("/api/app/me")
+    assert r.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_soft_deleted_user_rejected(app, db_session):
+    from sqlalchemy import update
+    raw = await _mint_for(db_session, 88888)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+        r_redeem = await c.post("/api/app/auth/redeem", json={"t": raw})
+        assert r_redeem.status_code == 200, "redeem must succeed before soft-deleting"
+        # Soft-delete the user in the DB so current_user sees deleted_at is not None
+        from energybot.core.models import User as U
+        await db_session.execute(
+            update(U).where(U.bale_user_id == 88888).values(deleted_at=datetime.utcnow())
+        )
+        await db_session.commit()
         r = await c.get("/api/app/me")
     assert r.status_code == 401
 

@@ -50,14 +50,14 @@ async def current_user(
     user = (await session.execute(select(User).where(User.id == row.user_id))).scalar_one_or_none()
     if user is None or user.is_blocked or user.deleted_at is not None:
         raise HTTPException(status_code=401, detail="inactive")
-    row.last_seen_at = datetime.utcnow()
-    await session.commit()
     s = get_settings()
     expected = sign_csrf(s.session_secret, sid)
-    response.headers["x-csrf"] = expected
     if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
         if request.headers.get("x-csrf") != expected:
             raise HTTPException(status_code=403, detail="bad csrf")
+    response.headers["x-csrf"] = expected
+    row.last_seen_at = datetime.utcnow()
+    await session.commit()
     return user
 
 
