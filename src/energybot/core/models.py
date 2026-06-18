@@ -259,7 +259,7 @@ class UtilitySubscription(Base):
     utility_type: Mapped[str] = mapped_column(String(20), nullable=False)
     bill_id: Mapped[str] = mapped_column(String(20), nullable=False)
     label: Mapped[str | None] = mapped_column(String(200))
-    created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(default=_ts, server_default=func.now(), nullable=False)
     deleted_at: Mapped[datetime | None] = mapped_column()
     __table_args__ = (UniqueConstraint("user_id", "bill_id", name="uq_subscription_user_bill"),)
 

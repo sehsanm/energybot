@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from datetime import datetime
 from uuid import UUID
-from sqlalchemy import select
+from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from energybot.core.models import User, UtilitySubscription, Bill, BillPayment
 from energybot.billing.finnotech_client import BillDetail
@@ -97,3 +97,12 @@ class BillingRepository:
             .order_by(Bill.inquired_at.desc(), Bill.id.desc())
             .limit(limit)
         )).scalars().all())
+
+    async def list_subscriptions(self, user_id: UUID) -> list[UtilitySubscription]:
+        s = self._session_factory()
+        rows = (await s.execute(
+            select(UtilitySubscription)
+            .where(UtilitySubscription.user_id == user_id, UtilitySubscription.deleted_at.is_(None))
+            .order_by(desc(UtilitySubscription.created_at))
+        )).scalars().all()
+        return list(rows)
