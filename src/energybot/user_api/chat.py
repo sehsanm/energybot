@@ -3,7 +3,7 @@ import json
 import os
 from typing import Annotated
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -49,29 +49,31 @@ _FALLBACK = "متأسفم، یه مشکل فنی پیش اومد. می‌تون�
 @router.post("/chat")
 async def chat(payload: ChatIn, user: User = Depends(current_user)):
     s = get_settings()
-    sf = get_sessionmaker()
     text = payload.text
-    chat_repo = ChatRepository(session_factory=sf, idle_minutes=s.session_idle_minutes)
 
     async def gen():
         yield _sse("status", {"text": "در حال فکر کردن…"})
+        Session = get_sessionmaker()
         web = WebChannel()
-        try:
-            agent = build_agent(user_id=user.id, channel=web, session_factory=sf)
-            final = await agent.handle(text)
-        except Exception:
-            get_logger(__name__).exception("web_chat_failed", user_id=str(user.id))
-            yield _sse("error", {"text": _FALLBACK})
-            return
-        for ev in web.events:
-            yield _sse("media", ev)
-        n = max(1, s.web_chat_chunk_chars)
-        for i in range(0, len(final), n):
-            yield _sse("chunk", {"text": final[i:i + n]})
-            if s.web_chat_chunk_delay_ms:
-                await asyncio.sleep(s.web_chat_chunk_delay_ms / 1000)
-        msg_id = await chat_repo.latest_assistant_message_id(user.id)
-        yield _sse("done", {"message_id": msg_id})
+        async with Session() as session:
+            sf = lambda: session
+            chat_repo = ChatRepository(session_factory=sf, idle_minutes=s.session_idle_minutes)
+            try:
+                agent = build_agent(user_id=user.id, channel=web, session_factory=sf)
+                final = await agent.handle(text)
+            except Exception:
+                get_logger(__name__).exception("web_chat_failed", user_id=str(user.id))
+                yield _sse("error", {"text": _FALLBACK})
+                return
+            for ev in web.events:
+                yield _sse("media", ev)
+            n = max(1, s.web_chat_chunk_chars)
+            for i in range(0, len(final), n):
+                yield _sse("chunk", {"text": final[i:i + n]})
+                if s.web_chat_chunk_delay_ms:
+                    await asyncio.sleep(s.web_chat_chunk_delay_ms / 1000)
+            msg_id = await chat_repo.latest_assistant_message_id(user.id)
+            yield _sse("done", {"message_id": msg_id})
 
     return StreamingResponse(gen(), media_type="text/event-stream")
 
@@ -83,9 +85,11 @@ async def chat_history(
     limit: Annotated[int, Query(ge=1, le=100)] = 30,
 ):
     s = get_settings()
-    repo = ChatRepository(session_factory=get_sessionmaker(), idle_minutes=s.session_idle_minutes)
-    rows = await repo.history_page(user.id, before=before, limit=limit)
-    return {"messages": [
-        {"id": m.id, "role": m.role, "content": m.content, "created_at": m.created_at.isoformat()}
-        for m in rows
-    ]}
+    Session = get_sessionmaker()
+    async with Session() as session:
+        repo = ChatRepository(session_factory=lambda: session, idle_minutes=s.session_idle_minutes)
+        rows = await repo.history_page(user.id, before=before, limit=limit)
+        return {"messages": [
+            {"id": m.id, "role": m.role, "content": m.content, "created_at": m.created_at.isoformat()}
+            for m in rows
+        ]}
