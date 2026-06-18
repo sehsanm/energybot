@@ -45,6 +45,9 @@ class Settings(BaseSettings):
     summary_message_threshold: int = 20
     tool_iteration_cap: int = 6
     session_idle_minutes: int = 30
+    web_login_token_ttl_minutes: int = 5
+    user_session_days: int = 30
+    public_base_url: str = ""
     soft_delete_grace_days: int = 30
 
     log_level: str = "INFO"
