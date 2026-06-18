@@ -53,7 +53,8 @@ def build_agent_for_user(user_id, chat_id, session_factory):
     registry.register(UpdateProfileTool(repo=profile_repo, user_id=user_id, current_message_id=None))
     registry.register(RecordCommitmentTool(repo=profile_repo, user_id=user_id, current_message_id=None))
     registry.register(SearchKBTool(retrieval=retrieval))
-    registry.register(SendKBMediaTool(bale=get_bale_client(), session_factory=session_factory, chat_id=chat_id))
+    from energybot.agent.channels import BaleChannel
+    registry.register(SendKBMediaTool(channel=BaleChannel(get_bale_client(), chat_id), session_factory=session_factory))
     registry.register(ReadBillsTool(repo=BillingRepository(session_factory=session_factory), user_id=user_id))
 
     class _Adapter:

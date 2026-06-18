@@ -1,6 +1,7 @@
 import pytest
 from uuid import uuid4
 from energybot.core.models import User, KBArticle, KBAttachment
+from energybot.agent.channels import BaleChannel
 from energybot.agent.tools.send_kb_media import SendKBMediaTool
 
 
@@ -32,7 +33,7 @@ async def test_send_image_caches_file_id(db_session):
     await db_session.commit()
 
     bale = FakeBaleClient()
-    tool = SendKBMediaTool(bale=bale, session_factory=lambda: db_session, chat_id=int(u.bale_user_id))
+    tool = SendKBMediaTool(channel=BaleChannel(bale, int(u.bale_user_id)), session_factory=lambda: db_session)
     result = await tool.invoke({"attachment_id": str(att.id), "caption": "نگاه کن"})
     assert result["ok"] is True
     assert bale.sent[0]["photo"]["file_id"] is None
