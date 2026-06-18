@@ -131,7 +131,23 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
             await _send_step(bale, parsed.chat_id, step)
             return
         if text == "/help":
-            await bale.send_message(chat_id=parsed.chat_id, text="من یک دستیار صرفه‌جویی انرژی هستم. /profile برای دیدن پروفایل، /forget برای فراموش‌کردن من، /restart برای شروع گفتگوی تازه، /bill برای استعلام و پرداخت قبض.")
+            await bale.send_message(chat_id=parsed.chat_id, text="من یک دستیار صرفه‌جویی انرژی هستم. /profile برای دیدن پروفایل، /forget برای فراموش‌کردن من، /restart برای شروع گفتگوی تازه، /bill برای استعلام و پرداخت قبض. /web برای ورود به نسخهٔ وب.")
+            return
+        if text == "/web":
+            from energybot.settings import get_settings
+            from energybot.user_api.tokens import mint_login_token
+            from energybot.bale_adapter.web_login import build_web_login_markup
+            s = get_settings()
+            if not s.public_base_url:
+                await bale.send_message(chat_id=parsed.chat_id, text="نسخهٔ وب هنوز پیکربندی نشده است.")
+                return
+            raw = await mint_login_token(session, user.id, ttl_minutes=s.web_login_token_ttl_minutes)
+            url = f"{s.public_base_url.rstrip('/')}/app/auth?t={raw}"
+            await bale.send_message(
+                chat_id=parsed.chat_id,
+                text="برای ورود به نسخهٔ وب روی دکمهٔ زیر بزن. این لینک یک‌بارمصرف است و تا چند دقیقه اعتبار دارد.",
+                reply_markup=build_web_login_markup(url),
+            )
             return
         if text == "/profile":
             from energybot.profile.render import render_profile_summary, render_bills_line
