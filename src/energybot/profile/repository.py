@@ -69,6 +69,23 @@ class ProfileRepository:
         ))
         await s.commit()
 
+    async def remove_item(self, user_id: UUID, section: str, index: int, *, source: str, reason: str) -> None:
+        if section not in ("goals", "commitments"):
+            raise ValueError(f"remove_item only supports goals|commitments, got {section!r}")
+        s = self._session_factory()
+        p = (await s.execute(select(Profile).where(Profile.user_id == user_id))).scalar_one()
+        arr = list(getattr(p, section))
+        if index < 0 or index >= len(arr):
+            raise IndexError(index)
+        removed = arr.pop(index)
+        setattr(p, section, arr)
+        p.completeness_score = _compute_completeness(p)
+        s.add(ProfileEvent(
+            user_id=user_id, field_path=f"{section}[-{index}]",
+            before={"item": removed}, after=None, source=source, reason=reason,
+        ))
+        await s.commit()
+
     async def append(self, user_id: UUID, section: str, item: Any, *, source: str, reason: str, source_message_id: int | None = None) -> None:
         if section not in ("goals", "commitments"):
             raise ValueError(f"append only supports goals|commitments, got {section!r}")

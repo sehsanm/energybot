@@ -75,3 +75,67 @@ export async function streamChat(text: string, h: StreamHandlers): Promise<void>
     h.onError?.("ارتباط قطع شد");
   }
 }
+
+export type Subscription = { id: string; utility_type: string; bill_id: string; label: string | null };
+export type BillRow = {
+  id: string; utility_type: string; amount: number; term: string | null;
+  consumption: number | null; due_date: string | null; status: string; inquired_at: string;
+};
+
+export async function getBills(): Promise<{ subscriptions: Subscription[]; bills: BillRow[] }> {
+  const r = await req("/bills");
+  if (!r.ok) throw new Error(String(r.status));
+  return r.json();
+}
+
+export async function inquireBill(billId: string): Promise<{ ok: boolean; summary: string; bill_db_id: string | null; error: string | null }> {
+  const r = await req("/bills/inquire", { method: "POST", body: JSON.stringify({ bill_id: billId }) });
+  if (!r.ok) throw new Error(String(r.status));
+  return r.json();
+}
+
+export async function payBill(billDbId: string): Promise<string> {
+  const r = await req(`/bills/${billDbId}/pay`, { method: "POST" });
+  if (!r.ok) throw new Error(String(r.status));
+  return (await r.json()).url;
+}
+
+export type ProfileField = { key: string; label: string; options: string[] | null; path: string };
+export type ProfileData = {
+  household: Record<string, unknown>; behaviour: Record<string, unknown>;
+  goals: string[]; commitments: string[]; completeness_score: number; fields: ProfileField[];
+};
+
+export async function getProfile(): Promise<ProfileData> {
+  const r = await req("/profile");
+  if (!r.ok) throw new Error(String(r.status));
+  return r.json();
+}
+export async function patchProfile(path: string, value: string): Promise<ProfileData> {
+  const r = await req("/profile", { method: "PATCH", body: JSON.stringify({ path, value }) });
+  if (!r.ok) throw new Error(String(r.status));
+  return r.json();
+}
+export async function addProfileItem(section: "goals" | "commitments", text: string): Promise<ProfileData> {
+  const r = await req(`/profile/${section}`, { method: "POST", body: JSON.stringify({ text }) });
+  if (!r.ok) throw new Error(String(r.status));
+  return r.json();
+}
+export async function removeProfileItem(section: "goals" | "commitments", index: number): Promise<ProfileData> {
+  const r = await req(`/profile/${section}/${index}`, { method: "DELETE" });
+  if (!r.ok) throw new Error(String(r.status));
+  return r.json();
+}
+
+export type SessionRow = { id: string; started_at: string; ended_at: string | null; message_count: number; snippet: string };
+
+export async function getSessions(): Promise<SessionRow[]> {
+  const r = await req("/chat/sessions");
+  if (!r.ok) throw new Error(String(r.status));
+  return (await r.json()).sessions;
+}
+export async function getSessionMessages(id: string): Promise<ChatMsg[]> {
+  const r = await req(`/chat/sessions/${id}`);
+  if (!r.ok) throw new Error(String(r.status));
+  return (await r.json()).messages;
+}

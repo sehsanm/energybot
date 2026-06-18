@@ -8,6 +8,7 @@ from energybot.bale_adapter.parser import parse_update, UpdateText, UpdateCallba
 from energybot.core.models import User, Profile
 from energybot.profile.repository import ProfileRepository
 from energybot.profile.wizard import WizardEngine
+from energybot.billing.factory import build_billing_service
 from energybot.settings import get_settings
 
 
@@ -26,29 +27,6 @@ def build_agent_for_user(user_id, chat_id, session_factory):
     from energybot.agent.builder import build_agent
     from energybot.agent.channels import BaleChannel
     return build_agent(user_id=user_id, channel=BaleChannel(get_bale_client(), chat_id), session_factory=session_factory)
-
-
-def build_billing_service(session_factory):
-    from energybot.billing.service import BillingService
-    from energybot.billing.repository import BillingRepository
-    from energybot.billing.finnotech_client import FinnotechClient
-    from energybot.billing.payment import GenericRedirectProvider, FakePaymentProvider
-    s = get_settings()
-    fin = FinnotechClient(
-        client_id=s.finnotech_client_id, client_secret=s.finnotech_client_secret,
-        national_id=s.finnotech_national_id, scope=s.finnotech_scope,
-        base_url=s.finnotech_base_url, token_path=s.finnotech_token_path,
-        inquiry_path=s.finnotech_inquiry_path,
-    )
-    if s.payment_provider == "generic" and s.payment_gateway_base:
-        payment = GenericRedirectProvider(gateway_base=s.payment_gateway_base, merchant_id=s.payment_merchant_id)
-    else:
-        payment = FakePaymentProvider()
-    return BillingService(
-        finnotech=fin, payment=payment,
-        repo=BillingRepository(session_factory=session_factory),
-        callback_base_url=s.payment_callback_base_url, provider_name=s.payment_provider,
-    )
 
 
 async def _send_capture(bale, chat_id, res):

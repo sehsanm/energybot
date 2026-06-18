@@ -78,6 +78,34 @@ async def chat(payload: ChatIn, user: User = Depends(current_user)):
     return StreamingResponse(gen(), media_type="text/event-stream")
 
 
+@router.get("/chat/sessions")
+async def chat_sessions(user: User = Depends(current_user)):
+    s = get_settings()
+    Session = get_sessionmaker()
+    async with Session() as session:
+        repo = ChatRepository(session_factory=lambda: session, idle_minutes=s.session_idle_minutes)
+        return {"sessions": await repo.list_sessions(user.id)}
+
+
+@router.get("/chat/sessions/{session_id}")
+async def chat_session_messages(session_id: str, user: User = Depends(current_user)):
+    try:
+        sid = UUID(session_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="not found")
+    s = get_settings()
+    Session = get_sessionmaker()
+    async with Session() as session:
+        repo = ChatRepository(session_factory=lambda: session, idle_minutes=s.session_idle_minutes)
+        if await repo.get_session_owned(user.id, sid) is None:
+            raise HTTPException(status_code=404, detail="not found")
+        rows = await repo.session_messages(user.id, sid)
+        return {"messages": [
+            {"id": m.id, "role": m.role, "content": m.content, "created_at": m.created_at.isoformat()}
+            for m in rows
+        ]}
+
+
 @router.get("/chat/history")
 async def chat_history(
     user: User = Depends(current_user),

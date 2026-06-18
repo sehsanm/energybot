@@ -2,7 +2,7 @@ from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import Any
 from uuid import UUID
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from energybot.core.models import ChatSession, ChatSummary, Message
@@ -83,6 +83,50 @@ class ChatRepository:
         q = q.order_by(desc(Message.id)).limit(limit)
         rows = (await s.execute(q)).scalars().all()
         return list(reversed(rows))
+
+    async def list_sessions(self, user_id: UUID) -> list[dict]:
+        s = self._session_factory()
+        sessions = (await s.execute(
+            select(ChatSession).where(ChatSession.user_id == user_id).order_by(desc(ChatSession.started_at))
+        )).scalars().all()
+        out: list[dict] = []
+        for sess in sessions:
+            count = (await s.execute(
+                select(func.count()).select_from(Message).where(
+                    Message.session_id == sess.id,
+                    Message.role.in_(("user", "assistant")),
+                    Message.deleted_at.is_(None),
+                )
+            )).scalar_one()
+            snippet = (await s.execute(
+                select(Message.content).where(
+                    Message.session_id == sess.id, Message.role == "user", Message.deleted_at.is_(None)
+                ).order_by(Message.id).limit(1)
+            )).scalar_one_or_none()
+            out.append({
+                "id": str(sess.id),
+                "started_at": sess.started_at.isoformat(),
+                "ended_at": sess.ended_at.isoformat() if sess.ended_at else None,
+                "message_count": int(count),
+                "snippet": (snippet or "")[:80],
+            })
+        return out
+
+    async def get_session_owned(self, user_id: UUID, session_id: UUID) -> ChatSession | None:
+        s = self._session_factory()
+        return (await s.execute(
+            select(ChatSession).where(ChatSession.id == session_id, ChatSession.user_id == user_id)
+        )).scalar_one_or_none()
+
+    async def session_messages(self, user_id: UUID, session_id: UUID) -> list[Message]:
+        s = self._session_factory()
+        rows = (await s.execute(
+            select(Message).where(
+                Message.user_id == user_id, Message.session_id == session_id,
+                Message.role.in_(("user", "assistant")), Message.deleted_at.is_(None),
+            ).order_by(Message.id)
+        )).scalars().all()
+        return list(rows)
 
     async def latest_assistant_message_id(self, user_id: UUID) -> int | None:
         s = self._session_factory()
