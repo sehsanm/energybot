@@ -165,3 +165,18 @@ async def test_redeem_rate_limited(app, db_session):
             await c.post("/api/app/auth/redeem", json={"t": "nope"})
         r = await c.post("/api/app/auth/redeem", json={"t": "nope"})
     assert r.status_code == 429
+
+
+@pytest.mark.asyncio
+async def test_logout_requires_csrf(app, db_session):
+    raw = await _mint_for(db_session, 99999)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+        r_redeem = await c.post("/api/app/auth/redeem", json={"t": raw})
+        assert r_redeem.status_code == 200
+        csrf = r_redeem.headers["x-csrf"]
+        # Without x-csrf header → 403
+        r_no_csrf = await c.post("/api/app/auth/logout")
+        assert r_no_csrf.status_code == 403
+        # With correct x-csrf header → 200
+        r_ok = await c.post("/api/app/auth/logout", headers={"x-csrf": csrf})
+        assert r_ok.status_code == 200

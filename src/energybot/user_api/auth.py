@@ -88,6 +88,8 @@ async def redeem(payload: RedeemIn, request: Request, response: Response,
     session.add(UserSession(id=sid, user_id=user.id, expires_at=expires))
     user.last_seen_at = datetime.utcnow()
     await session.commit()
+    # SameSite=lax (admin uses strict): this user app is entered via external Bale
+    # deep links, so the session cookie must ride top-level cross-site navigations.
     response.set_cookie("energybot_user", cookie_val, max_age=s.user_session_days * 86400,
                         httponly=True, samesite="lax", secure=False)
     response.headers["x-csrf"] = sign_csrf(s.session_secret, sid)
@@ -100,6 +102,9 @@ async def logout(response: Response, request: Request,
                  session: AsyncSession = Depends(get_session)) -> dict:
     if energybot_user:
         sid = session_id_for(energybot_user)
+        expected = sign_csrf(get_settings().session_secret, sid)
+        if request.headers.get("x-csrf") != expected:
+            raise HTTPException(status_code=403, detail="bad csrf")
         row = (await session.execute(select(UserSession).where(UserSession.id == sid))).scalar_one_or_none()
         if row is not None:
             await session.delete(row)
