@@ -20,7 +20,12 @@
 DEPLOY_NPM_REGISTRY=https://package-mirror.liara.ir/repository/npm/
 DEPLOY_PIP_INDEX_URL=https://mirror.abrha.net/repository/pypi/simple
 #DEPLOY_PIP_EXTRA_INDEX_URL=https://pypi.org/simple
-DEPLOY_APT_MIRROR=mirror.arvancloud.ir
+# APT: leave on canonical deb.debian.org (verified reachable from the VPS,
+# 2026-06-19). The arvancloud mirror's trixie/main pool is incomplete (404s
+# on libv4l-0t64 / libxau6), and no domestic mirror we probed serves both
+# main and trixie-security. Override here only if canonical becomes
+# unreachable AND you find a complete mirror.
+#DEPLOY_APT_MIRROR=mirror.arvancloud.ir
 
 set -euo pipefail
 
