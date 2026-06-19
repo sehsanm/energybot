@@ -36,6 +36,7 @@ ARG APT_MIRROR=
 ARG PIP_INDEX_URL=
 ARG PIP_EXTRA_INDEX_URL=
 RUN if [ -n "$APT_MIRROR" ]; then sed -i "s|http://deb.debian.org|http://$APT_MIRROR|g" /etc/apt/sources.list.d/debian.sources; fi \
+ && sed -i "s| trixie-updates||g" /etc/apt/sources.list.d/debian.sources \
  && apt-get -o Acquire::Check-Valid-Until=false update \
  && apt-get install -y --no-install-recommends libmagic1 libzbar0 ca-certificates \
  && rm -rf /var/lib/apt/lists/*
