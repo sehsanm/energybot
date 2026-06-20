@@ -114,7 +114,7 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
         if text.startswith("/bill"):
             arg = text[len("/bill"):].strip()
             if not arg:
-                await bale.send_message(chat_id=parsed.chat_id, text="شناسه قبض را بفرست یا عکس قبض را ارسال کن.")
+                await _send_bill_prompt(bale, parsed.chat_id)
                 return
             try:
                 svc = build_billing_service(session_factory)

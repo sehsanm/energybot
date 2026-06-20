@@ -61,3 +61,24 @@ async def test_reply_kb_bill_label_sends_bill_prompt(db_session, wired):
     await handle_bale_update(_text(951, "قبض من", 60), session_factory=lambda: db_session)
     assert "قبض" in bale.sent[-1]["text"]
     assert agent.calls == []
+
+
+@pytest.mark.asyncio
+async def test_reply_kb_profile_label_routes_to_profile(db_session, wired):
+    bale, agent = wired
+    await _onboard(db_session, 952)
+    bale.sent.clear()
+    await handle_bale_update(_text(952, "پروفایل", 70), session_factory=lambda: db_session)
+    assert agent.calls == []
+    assert len(bale.sent) >= 1
+    assert bale.sent[-1]["text"]  # non-empty profile summary was sent
+
+
+@pytest.mark.asyncio
+async def test_reply_kb_web_label_routes_to_web(db_session, wired):
+    bale, agent = wired
+    await _onboard(db_session, 953)
+    bale.sent.clear()
+    await handle_bale_update(_text(953, "نسخه وب", 80), session_factory=lambda: db_session)
+    assert agent.calls == []
+    assert "وب" in bale.sent[-1]["text"]
