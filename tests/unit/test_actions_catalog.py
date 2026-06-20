@@ -1,3 +1,5 @@
+import pytest
+
 from energybot.bale_adapter.actions import (
     CATALOG, CATALOG_KEYS, build_suggestions_markup, REPLY_KB_ROUTES, QuickAction,
 )
@@ -36,3 +38,12 @@ def test_reply_kb_routes_cover_core_four():
     assert REPLY_KB_ROUTES == {
         "قبض من": "bill", "پروفایل": "profile", "نسخه وب": "web", "راهنما": "home",
     }
+
+
+def test_prompt_kind_requires_nonempty_prompt():
+    with pytest.raises(ValueError):
+        QuickAction("x", "label", "prompt")  # missing prompt
+    with pytest.raises(ValueError):
+        QuickAction("x", "label", "prompt", prompt="")  # empty prompt
+    # non-prompt kinds don't require a prompt
+    QuickAction("y", "label", "home")

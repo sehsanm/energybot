@@ -8,6 +8,10 @@ class QuickAction:
     kind: str            # "profile" | "bill" | "web" | "home" | "prompt"
     prompt: str | None = None  # required when kind == "prompt"
 
+    def __post_init__(self):
+        if self.kind == "prompt" and not self.prompt:
+            raise ValueError(f"QuickAction {self.key!r}: kind='prompt' requires a non-empty prompt")
+
 
 CATALOG: dict[str, QuickAction] = {
     "view_profile": QuickAction("view_profile", "پروفایل من", "profile"),
