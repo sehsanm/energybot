@@ -68,4 +68,6 @@ ENV ENERGYBOT_APP_STATIC_DIR=/app/app_ui/out
 ENV MEDIA_ROOT=/var/lib/energybot/media
 RUN mkdir -p $MEDIA_ROOT
 EXPOSE 8000
-CMD ["uvicorn", "energybot.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# --proxy-headers makes uvicorn trust X-Forwarded-Proto/For from the local
+# reverse proxy (Caddy on 127.0.0.1), so app-generated redirects use https.
+CMD ["uvicorn", "energybot.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]

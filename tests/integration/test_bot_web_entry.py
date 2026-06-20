@@ -59,6 +59,6 @@ async def test_web_command_sends_deep_link_button(monkeypatch, db_session, fake_
     assert len(fake_bale.sent) >= 1
     last = fake_bale.sent[-1]
     btn = last["reply_markup"]["inline_keyboard"][0][0]
-    assert btn["url"].startswith("https://app.example.ir/app/auth?t=")
+    assert btn["url"].startswith("https://app.example.ir/app/auth/?t=")
     tok = (await db_session.execute(select(WebLoginToken))).scalars().first()
     assert tok is not None

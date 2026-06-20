@@ -220,7 +220,9 @@ async def _send_web(bale, session, user, chat_id) -> None:
         await bale.send_message(chat_id=chat_id, text="نسخهٔ وب هنوز پیکربندی نشده است.")
         return
     raw = await mint_login_token(session, user.id, ttl_minutes=s.web_login_token_ttl_minutes)
-    url = f"{s.public_base_url.rstrip('/')}/app/auth?t={raw}"
+    # Trailing slash matches the app_ui static export (trailingSlash: true) so the
+    # link resolves directly without a 307 that would downgrade the token to http.
+    url = f"{s.public_base_url.rstrip('/')}/app/auth/?t={raw}"
     await bale.send_message(
         chat_id=chat_id,
         text="برای ورود به نسخهٔ وب روی دکمهٔ زیر بزن. این لینک یک‌بارمصرف است و تا چند دقیقه اعتبار دارد.",
