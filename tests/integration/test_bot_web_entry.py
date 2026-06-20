@@ -43,7 +43,7 @@ async def test_web_command_sends_deep_link_button(monkeypatch, db_session, fake_
     db_session.add(u)
     await db_session.flush()
     db_session.add(Profile(user_id=u.id))
-    db_session.add(OnboardingState(user_id=u.id, current_step="city", answers={}, completed_at=datetime.utcnow()))
+    db_session.add(OnboardingState(user_id=u.id, current_step="main_concern", answers={}, completed_at=datetime.utcnow()))
     await db_session.commit()
 
     def session_factory():

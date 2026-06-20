@@ -32,6 +32,11 @@ def _text(uid, t, update_id=1):
     return {"update_id": update_id, "message": {"message_id": update_id, "from": {"id": uid}, "chat": {"id": uid}, "text": t}}
 
 
+def _cb(uid, data, update_id=1):
+    return {"update_id": update_id, "callback_query": {"id": "cb1", "from": {"id": uid},
+            "message": {"message_id": 1, "chat": {"id": uid}}, "data": data}}
+
+
 @pytest.mark.asyncio
 async def test_first_message_non_start_triggers_intro_and_wizard(db_session, monkeypatch):
     bale = FakeBale()
@@ -72,6 +77,7 @@ async def test_help_shows_home(db_session, monkeypatch):
     await handle_bale_update(_text(903, "/help", 2), session_factory=lambda: db_session)
     from energybot.bale_adapter.home import HOME_TEXT
     assert bale.sent[-1]["text"] == HOME_TEXT
+    assert bale.sent[-1]["reply_markup"]["keyboard"]
 
 
 @pytest.mark.asyncio
@@ -82,6 +88,31 @@ async def test_wizard_completion_shows_home(db_session, monkeypatch):
     answers = ["تهران", "آپارتمان", "2", "60-100", "پکیج", "اسپلیت", "کاهش قبض برق"]
     for i, ans in enumerate(answers, start=2):
         await handle_bale_update(_text(904, ans, i), session_factory=lambda: db_session)
+    from energybot.bale_adapter.home import HOME_TEXT
+    assert bale.sent[-1]["text"] == HOME_TEXT
+    assert bale.sent[-1]["reply_markup"]["keyboard"]
+
+
+@pytest.mark.asyncio
+async def test_wizard_completion_via_callback_shows_home(db_session, monkeypatch):
+    bale = FakeBale()
+    _wire(monkeypatch, bale)
+    uid = 905
+    # Start onboarding: first message triggers intro + asks city (text-only step).
+    await handle_bale_update(_text(uid, "/start", 1), session_factory=lambda: db_session)
+    # Answer city via text (city has no inline buttons).
+    await handle_bale_update(_text(uid, "تهران", 2), session_factory=lambda: db_session)
+    # Answer the remaining 6 wizard steps via callback button presses.
+    cb_answers = [
+        "آپارتمان",   # home_type
+        "2",           # occupants
+        "60-100",      # area_m2
+        "پکیج",        # heating_type
+        "اسپلیت",      # cooling_type
+        "کاهش قبض برق",  # main_concern
+    ]
+    for i, val in enumerate(cb_answers, start=3):
+        await handle_bale_update(_cb(uid, val, update_id=i), session_factory=lambda: db_session)
     from energybot.bale_adapter.home import HOME_TEXT
     assert bale.sent[-1]["text"] == HOME_TEXT
     assert bale.sent[-1]["reply_markup"]["keyboard"]

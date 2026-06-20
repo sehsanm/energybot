@@ -27,7 +27,7 @@ async def _seed_done_user(db_session, uid):
     from datetime import datetime
     from energybot.core.models import Profile, OnboardingState
     db_session.add(Profile(user_id=u.id))
-    db_session.add(OnboardingState(user_id=u.id, current_step="city", answers={}, completed_at=datetime.utcnow()))
+    db_session.add(OnboardingState(user_id=u.id, current_step="main_concern", answers={}, completed_at=datetime.utcnow()))
     await db_session.commit()
     return u
 
