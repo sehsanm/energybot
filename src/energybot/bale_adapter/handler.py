@@ -139,12 +139,13 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
 
         try:
             agent = build_agent_for_user(user.id, parsed.chat_id, session_factory)
-            reply = await agent.handle(text)
+            result = await agent.handle(text)
+            reply_text = result.text
         except Exception:
             from energybot.logging import get_logger
             get_logger(__name__).exception("agent_call_failed", user_id=str(user.id), chat_id=parsed.chat_id)
-            reply = "متأسفم، یه مشکل فنی پیش اومد. می‌تونی یک بار دیگه تلاش کنی؟"
-        await bale.send_message(chat_id=parsed.chat_id, text=reply)
+            reply_text = "متأسفم، یه مشکل فنی پیش اومد. می‌تونی یک بار دیگه تلاش کنی؟"
+        await bale.send_message(chat_id=parsed.chat_id, text=reply_text)
 
     elif isinstance(parsed, UpdatePhoto):
         try:

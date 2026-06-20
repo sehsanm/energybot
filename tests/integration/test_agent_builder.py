@@ -45,6 +45,8 @@ async def test_build_agent_handles_message_with_webchannel(monkeypatch, db_sessi
     from energybot.agent.channels import WebChannel
     def sf():
         return db_session
+    from energybot.agent.result import AgentResult
     agent = builder.build_agent(user_id=u.id, channel=WebChannel(), session_factory=sf)
     reply = await agent.handle("سلام")
-    assert reply == "پاسخ آزمایشی"
+    assert isinstance(reply, AgentResult)
+    assert reply.text == "پاسخ آزمایشی"
