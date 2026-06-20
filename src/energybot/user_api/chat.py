@@ -60,7 +60,8 @@ async def chat(payload: ChatIn, user: User = Depends(current_user)):
             chat_repo = ChatRepository(session_factory=sf, idle_minutes=s.session_idle_minutes)
             try:
                 agent = build_agent(user_id=user.id, channel=web, session_factory=sf)
-                final = await agent.handle(text)
+                result = await agent.handle(text)
+                final = result.text
             except Exception:
                 get_logger(__name__).exception("web_chat_failed", user_id=str(user.id))
                 yield _sse("error", {"text": _FALLBACK})
