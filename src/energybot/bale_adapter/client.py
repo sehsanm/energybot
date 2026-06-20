@@ -38,6 +38,15 @@ class BaleClient:
     async def answer_callback_query(self, *, callback_query_id: str, text: str | None = None) -> None:
         await self._post_json("answerCallbackQuery", {"callback_query_id": callback_query_id, "text": text or ""})
 
+    async def set_my_commands(self, commands: list[dict]) -> None:
+        # Registers Bale's native "/" command menu. Best-effort: a transient
+        # failure at startup must not crash the app.
+        from energybot.logging import get_logger
+        try:
+            await self._post_json("setMyCommands", {"commands": commands})
+        except Exception as e:  # noqa: BLE001
+            get_logger(__name__).warning("set_my_commands_failed", error=str(e))
+
     async def send_photo(self, *, chat_id: int, file_id: str | None, file_path: str | None, caption: str | None) -> str | None:
         if file_id:
             await self._post_json("sendPhoto", {"chat_id": chat_id, "photo": file_id, "caption": caption or ""})

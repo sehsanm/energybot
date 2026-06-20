@@ -13,6 +13,8 @@ from energybot.agent.tools.record_commitment import RecordCommitmentTool
 from energybot.agent.tools.search_kb import SearchKBTool
 from energybot.agent.tools.send_kb_media import SendKBMediaTool
 from energybot.agent.tools.read_bills import ReadBillsTool
+from energybot.agent.tools.suggest_actions import SuggestActionsTool
+from energybot.agent.result import AgentResult
 from energybot.billing.repository import BillingRepository
 from energybot.chat.repository import ChatRepository
 from energybot.profile.repository import ProfileRepository
@@ -36,15 +38,19 @@ def build_agent(*, user_id: UUID, channel, session_factory: Callable[[], AsyncSe
     registry.register(SearchKBTool(retrieval=retrieval))
     registry.register(SendKBMediaTool(channel=channel, session_factory=session_factory))
     registry.register(ReadBillsTool(repo=BillingRepository(session_factory=session_factory), user_id=user_id))
+    suggest_tool = SuggestActionsTool()
+    registry.register(suggest_tool)
 
     class _Adapter:
-        async def handle(self_inner, text: str) -> str:
+        async def handle(self_inner, text: str) -> AgentResult:
+            suggest_tool.reset()
             summ = Summarizer(chat_repo=chat_repo, router=router, threshold=s.summary_message_threshold)
             loop = AgentLoop(
                 router=router, context_assembler=asm, chat_repo=chat_repo,
                 tool_registry=registry, summarizer=summ,
                 tool_iteration_cap=s.tool_iteration_cap, user_id=user_id,
             )
-            return await loop.handle_message(text)
+            text_out = await loop.handle_message(text)
+            return AgentResult(text=text_out, suggestions=list(suggest_tool.selected))
 
     return _Adapter()

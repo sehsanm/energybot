@@ -2,6 +2,7 @@ import pytest
 from sqlalchemy import select
 from energybot.bale_adapter.handler import handle_bale_update
 from energybot.core.models import User, OnboardingState, Profile
+from energybot.agent.result import AgentResult
 
 
 class FakeBale:
@@ -17,7 +18,8 @@ class FakeBale:
 
 
 class FakeAgent:
-    async def handle(self, text): return "پاسخ دستیار: " + text
+    async def handle(self, text):
+        return AgentResult(text="پاسخ دستیار: " + text, suggestions=[])
 
 
 @pytest.mark.asyncio

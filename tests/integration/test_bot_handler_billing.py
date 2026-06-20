@@ -21,11 +21,14 @@ class FakeBale:
 
 
 async def _seed_done_user(db_session, uid):
-    # /start then complete onboarding shortcut: insert user with no active wizard
+    # /start then complete onboarding shortcut: insert user with completed wizard
     u = User(bale_user_id=uid)
     db_session.add(u); await db_session.flush()
-    from energybot.core.models import Profile
-    db_session.add(Profile(user_id=u.id)); await db_session.commit()
+    from datetime import datetime
+    from energybot.core.models import Profile, OnboardingState
+    db_session.add(Profile(user_id=u.id))
+    db_session.add(OnboardingState(user_id=u.id, current_step="main_concern", answers={}, completed_at=datetime.utcnow()))
+    await db_session.commit()
     return u
 
 

@@ -62,8 +62,9 @@ async def test_chat_streams_status_media_chunks_done(app, db_session, monkeypatc
         class _A:
             async def handle(self, text):
                 from types import SimpleNamespace
+                from energybot.agent.result import AgentResult
                 await channel.send_media(SimpleNamespace(id=uuid4(), type="image"), "کپ")
-                return "سلام"  # 4 chars → 2 chunks at chunk_chars=3
+                return AgentResult(text="سلام", suggestions=[])  # 4 chars → 2 chunks at chunk_chars=3
         return _A()
 
     monkeypatch.setattr(chat_mod, "build_agent", fake_build_agent)
@@ -118,12 +119,13 @@ async def test_history_endpoint_returns_messages(app, db_session, monkeypatch):
     def fake_build_agent(*, user_id, channel, session_factory):
         class _A:
             async def handle(self, text):
+                from energybot.agent.result import AgentResult
                 from energybot.chat.repository import ChatRepository
                 repo = ChatRepository(session_factory=session_factory)
                 sid = await repo.session_for(user_id)
                 await repo.add_message(user_id, sid, role="user", content=text)
                 await repo.add_message(user_id, sid, role="assistant", content="پاسخ")
-                return "پاسخ"
+                return AgentResult(text="پاسخ", suggestions=[])
         return _A()
     monkeypatch.setattr(chat_mod, "build_agent", fake_build_agent)
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
