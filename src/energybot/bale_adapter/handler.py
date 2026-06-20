@@ -139,15 +139,7 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
             else:
                 await wizard.abandon(user.id)
 
-        try:
-            agent = build_agent_for_user(user.id, parsed.chat_id, session_factory)
-            result = await agent.handle(text)
-            reply_text = result.text
-        except Exception:
-            from energybot.logging import get_logger
-            get_logger(__name__).exception("agent_call_failed", user_id=str(user.id), chat_id=parsed.chat_id)
-            reply_text = "متأسفم، یه مشکل فنی پیش اومد. می‌تونی یک بار دیگه تلاش کنی؟"
-        await bale.send_message(chat_id=parsed.chat_id, text=reply_text)
+        await _reply_with_agent(bale, user, parsed.chat_id, text, session_factory)
 
     elif isinstance(parsed, UpdatePhoto):
         try:
@@ -165,6 +157,9 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
 
     elif isinstance(parsed, UpdateCallback):
         await bale.answer_callback_query(callback_query_id=parsed.callback_id)
+        if parsed.data.startswith("act:"):
+            await _dispatch_quick_action(bale, session, session_factory, user, parsed.chat_id, parsed.data[4:])
+            return
         if parsed.data.startswith("pay:"):
             from uuid import UUID
             svc = build_billing_service(session_factory)
@@ -235,3 +230,35 @@ async def _send_web(bale, session, user, chat_id) -> None:
 
 async def _send_bill_prompt(bale, chat_id) -> None:
     await bale.send_message(chat_id=chat_id, text="شناسه قبض را بفرست یا عکس قبض را ارسال کن.")
+
+
+async def _reply_with_agent(bale, user, chat_id, text, session_factory) -> None:
+    from energybot.bale_adapter.actions import build_suggestions_markup
+    try:
+        agent = build_agent_for_user(user.id, chat_id, session_factory)
+        result = await agent.handle(text)
+        reply_text = result.text
+        markup = build_suggestions_markup(result.suggestions)
+    except Exception:
+        from energybot.logging import get_logger
+        get_logger(__name__).exception("agent_call_failed", user_id=str(user.id), chat_id=chat_id)
+        reply_text = "متأسفم، یه مشکل فنی پیش اومد. می‌تونی یک بار دیگه تلاش کنی؟"
+        markup = None
+    await bale.send_message(chat_id=chat_id, text=reply_text, reply_markup=markup)
+
+
+async def _dispatch_quick_action(bale, session, session_factory, user, chat_id, key) -> None:
+    from energybot.bale_adapter.actions import CATALOG
+    action = CATALOG.get(key)
+    if action is None:
+        return
+    if action.kind == "home":
+        await _send_home(bale, chat_id)
+    elif action.kind == "profile":
+        await _send_profile(bale, session, session_factory, user, chat_id)
+    elif action.kind == "web":
+        await _send_web(bale, session, user, chat_id)
+    elif action.kind == "bill":
+        await _send_bill_prompt(bale, chat_id)
+    elif action.kind == "prompt":
+        await _reply_with_agent(bale, user, chat_id, action.prompt, session_factory)
