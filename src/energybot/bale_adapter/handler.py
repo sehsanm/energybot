@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from energybot.bale_adapter.client import BaleClient
 from energybot.bale_adapter.commands import is_command, is_wizard_answer
 from energybot.bale_adapter.parser import parse_update, UpdateText, UpdateCallback, UpdatePhoto, UpdateUnknown
-from energybot.core.models import User, Profile
+from energybot.core.models import User, Profile, OnboardingState
 from energybot.profile.repository import ProfileRepository
 from energybot.profile.wizard import WizardEngine
 from energybot.billing.factory import build_billing_service
@@ -62,12 +62,22 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
 
     if isinstance(parsed, UpdateText):
         text = parsed.text.strip()
-        if text == "/start":
+        if not await _has_onboarding_state(session, user.id):
+            from energybot.bale_adapter.home import INTRO_TEXT
+            await bale.send_message(chat_id=parsed.chat_id, text=INTRO_TEXT)
             step = await wizard.start(user.id)
             await _send_step(bale, parsed.chat_id, step)
             return
+        if text == "/start":
+            current = await wizard.current_step(user.id)
+            if current is not None:
+                # Mid-wizard: resume where they left off.
+                await _send_step(bale, parsed.chat_id, current)
+            else:
+                await _send_home(bale, parsed.chat_id)
+            return
         if text == "/help":
-            await bale.send_message(chat_id=parsed.chat_id, text="من یک دستیار صرفه‌جویی انرژی هستم. /profile برای دیدن پروفایل، /forget برای فراموش‌کردن من، /restart برای شروع گفتگوی تازه، /bill برای استعلام و پرداخت قبض. /web برای ورود به نسخهٔ وب.")
+            await _send_home(bale, parsed.chat_id)
             return
         if text == "/web":
             from energybot.settings import get_settings
@@ -130,7 +140,7 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
             if is_wizard_answer(text):
                 next_step = await wizard.answer(user.id, text)
                 if next_step is None:
-                    await bale.send_message(chat_id=parsed.chat_id, text="ممنون! حالا می‌توانم بهت کمک کنم. در چه موردی می‌خواهی صحبت کنیم؟")
+                    await _send_home(bale, parsed.chat_id)
                     return
                 await _send_step(bale, parsed.chat_id, next_step)
                 return
@@ -179,9 +189,20 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
         if current is not None:
             next_step = await wizard.answer(user.id, parsed.data)
             if next_step is None:
-                await bale.send_message(chat_id=parsed.chat_id, text="ممنون! حالا می‌توانم بهت کمک کنم. در چه موردی صحبت کنیم؟")
+                await _send_home(bale, parsed.chat_id)
             else:
                 await _send_step(bale, parsed.chat_id, next_step)
+
+
+async def _has_onboarding_state(session: AsyncSession, user_id) -> bool:
+    row = (await session.execute(select(OnboardingState).where(OnboardingState.user_id == user_id))).scalar_one_or_none()
+    return row is not None
+
+
+async def _send_home(bale: BaleClient, chat_id: int) -> None:
+    from energybot.bale_adapter.home import build_home_message
+    text, markup = build_home_message()
+    await bale.send_message(chat_id=chat_id, text=text, reply_markup=markup)
 
 
 async def _send_step(bale: BaleClient, chat_id: int, step) -> None:
