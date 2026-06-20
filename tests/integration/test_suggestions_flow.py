@@ -94,3 +94,15 @@ async def test_act_callback_prompt_kind_calls_agent(db_session, monkeypatch):
     from energybot.bale_adapter.actions import CATALOG
     assert agent.calls == [CATALOG["saving_tips"].prompt]
     assert bale.sent[-1]["text"].startswith("پاسخ:")
+
+
+@pytest.mark.asyncio
+async def test_act_callback_unknown_key_is_noop(db_session, monkeypatch):
+    bale = FakeBale()
+    agent = FakeAgent(suggestions=[])
+    _wire(monkeypatch, bale, agent)
+    await _onboard(db_session, 964)
+    bale.sent.clear()
+    await handle_bale_update(_cb(964, "act:__bogus__", 43), session_factory=lambda: db_session)
+    assert agent.calls == []
+    assert bale.sent == []

@@ -249,6 +249,7 @@ async def _reply_with_agent(bale, user, chat_id, text, session_factory) -> None:
 
 async def _dispatch_quick_action(bale, session, session_factory, user, chat_id, key) -> None:
     from energybot.bale_adapter.actions import CATALOG
+    from energybot.logging import get_logger
     action = CATALOG.get(key)
     if action is None:
         return
@@ -262,3 +263,5 @@ async def _dispatch_quick_action(bale, session, session_factory, user, chat_id, 
         await _send_bill_prompt(bale, chat_id)
     elif action.kind == "prompt":
         await _reply_with_agent(bale, user, chat_id, action.prompt, session_factory)
+    else:
+        get_logger(__name__).warning("unknown_quick_action_kind", key=key, kind=action.kind)
