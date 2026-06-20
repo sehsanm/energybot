@@ -61,6 +61,10 @@ class _AdminSpaStatic(StaticFiles):
 async def lifespan(app: FastAPI):
     log = get_logger(__name__)
     s = get_settings()
+    if s.bale_bot_token:
+        from energybot.bale_adapter.handler import get_bale_client
+        from energybot.bale_adapter.commands import BOT_COMMAND_MENU
+        await get_bale_client().set_my_commands(BOT_COMMAND_MENU)
     sched = make_scheduler()
     sched.start()
     poller: BalePoller | None = None
