@@ -80,31 +80,10 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
             await _send_home(bale, parsed.chat_id)
             return
         if text == "/web":
-            from energybot.settings import get_settings
-            from energybot.user_api.tokens import mint_login_token
-            from energybot.bale_adapter.web_login import build_web_login_markup
-            s = get_settings()
-            if not s.public_base_url:
-                await bale.send_message(chat_id=parsed.chat_id, text="نسخهٔ وب هنوز پیکربندی نشده است.")
-                return
-            raw = await mint_login_token(session, user.id, ttl_minutes=s.web_login_token_ttl_minutes)
-            url = f"{s.public_base_url.rstrip('/')}/app/auth?t={raw}"
-            await bale.send_message(
-                chat_id=parsed.chat_id,
-                text="برای ورود به نسخهٔ وب روی دکمهٔ زیر بزن. این لینک یک‌بارمصرف است و تا چند دقیقه اعتبار دارد.",
-                reply_markup=build_web_login_markup(url),
-            )
+            await _send_web(bale, session, user, parsed.chat_id)
             return
         if text == "/profile":
-            from energybot.profile.render import render_profile_summary, render_bills_line
-            from energybot.billing.repository import BillingRepository
-            p = await profile_repo.get(user.id)
-            summary = render_profile_summary(p.household or {}, p.behaviour or {}, p.goals or [], p.commitments or [])
-            bills = await BillingRepository(session_factory=session_factory).recent_bills(user.id, limit=6)
-            line = render_bills_line([{"utility_type": b.utility_type, "amount": int(b.amount), "term": b.term} for b in bills])
-            if line:
-                summary = summary + "\n\n" + line
-            await bale.send_message(chat_id=parsed.chat_id, text=summary)
+            await _send_profile(bale, session, session_factory, user, parsed.chat_id)
             return
         if text == "/restart":
             await bale.send_message(chat_id=parsed.chat_id, text="گفتگوی تازه آغاز شد. در چه موردی صحبت کنیم؟")
@@ -117,6 +96,19 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
             p.deleted_at = datetime.utcnow()
             await session.commit()
             await bale.send_message(chat_id=parsed.chat_id, text="باشد، اطلاعات شما حذف شد.")
+            return
+
+        from energybot.bale_adapter.actions import REPLY_KB_ROUTES
+        kind = REPLY_KB_ROUTES.get(text)
+        if kind is not None:
+            if kind == "home":
+                await _send_home(bale, parsed.chat_id)
+            elif kind == "profile":
+                await _send_profile(bale, session, session_factory, user, parsed.chat_id)
+            elif kind == "web":
+                await _send_web(bale, session, user, parsed.chat_id)
+            elif kind == "bill":
+                await _send_bill_prompt(bale, parsed.chat_id)
             return
 
         if text.startswith("/bill"):
@@ -210,3 +202,36 @@ async def _send_step(bale: BaleClient, chat_id: int, step) -> None:
     if step.buttons:
         markup = {"inline_keyboard": [[{"text": b, "callback_data": b}] for b in step.buttons]}
     await bale.send_message(chat_id=chat_id, text=step.prompt, reply_markup=markup)
+
+
+async def _send_profile(bale, session, session_factory, user, chat_id) -> None:
+    from energybot.profile.render import render_profile_summary, render_bills_line
+    from energybot.billing.repository import BillingRepository
+    profile_repo = ProfileRepository(session_factory=session_factory)
+    p = await profile_repo.get(user.id)
+    summary = render_profile_summary(p.household or {}, p.behaviour or {}, p.goals or [], p.commitments or [])
+    bills = await BillingRepository(session_factory=session_factory).recent_bills(user.id, limit=6)
+    line = render_bills_line([{"utility_type": b.utility_type, "amount": int(b.amount), "term": b.term} for b in bills])
+    if line:
+        summary = summary + "\n\n" + line
+    await bale.send_message(chat_id=chat_id, text=summary)
+
+
+async def _send_web(bale, session, user, chat_id) -> None:
+    from energybot.user_api.tokens import mint_login_token
+    from energybot.bale_adapter.web_login import build_web_login_markup
+    s = get_settings()
+    if not s.public_base_url:
+        await bale.send_message(chat_id=chat_id, text="نسخهٔ وب هنوز پیکربندی نشده است.")
+        return
+    raw = await mint_login_token(session, user.id, ttl_minutes=s.web_login_token_ttl_minutes)
+    url = f"{s.public_base_url.rstrip('/')}/app/auth?t={raw}"
+    await bale.send_message(
+        chat_id=chat_id,
+        text="برای ورود به نسخهٔ وب روی دکمهٔ زیر بزن. این لینک یک‌بارمصرف است و تا چند دقیقه اعتبار دارد.",
+        reply_markup=build_web_login_markup(url),
+    )
+
+
+async def _send_bill_prompt(bale, chat_id) -> None:
+    await bale.send_message(chat_id=chat_id, text="شناسه قبض را بفرست یا عکس قبض را ارسال کن.")
