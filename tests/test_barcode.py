@@ -1,7 +1,12 @@
 import io
+from pathlib import Path
 import pytest
 from energybot.billing.barcode import decode_bill_barcode
 from energybot.billing.bill_numbers import _check_digit
+
+# Barcode strip from a real electricity bill image, cropped so no personal data
+# is stored. Same شناسه‌قبض/شناسه‌پرداخت as the PDF fixture (same source bill).
+_IMAGE_FIXTURE = Path(__file__).parent / "fixtures" / "bill_barcode_sample.png"
 
 
 def _valid_pair() -> str:
@@ -36,3 +41,12 @@ def test_decode_reads_code128_bill_barcode():
     bn = decode_bill_barcode(png)
     assert bn is not None
     assert bn.bill_id == "117709580013" + _check_digit("117709580013")
+
+
+@pytest.mark.skipif(not _zbar_available(), reason="libzbar0 system library not installed")
+def test_extracts_numbers_from_real_bill_image():
+    bn = decode_bill_barcode(_IMAGE_FIXTURE.read_bytes())
+    assert bn is not None
+    assert bn.bill_id == "9706459904126"
+    assert bn.pay_id == "0001727250230"
+    assert bn.utility_type == "electricity"
