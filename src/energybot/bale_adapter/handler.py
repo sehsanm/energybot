@@ -116,15 +116,7 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
             if not arg:
                 await _send_bill_prompt(bale, parsed.chat_id)
                 return
-            try:
-                svc = build_billing_service(session_factory)
-                res = await svc.handle_input(user.id, text=arg)
-            except Exception:
-                from energybot.logging import get_logger
-                get_logger(__name__).exception("bill_command_failed", chat_id=parsed.chat_id)
-                await bale.send_message(chat_id=parsed.chat_id, text="متأسفم، در پردازش قبض مشکلی پیش اومد. بعداً دوباره امتحان کن.")
-                return
-            await _send_capture(bale, parsed.chat_id, res)
+            await _process_typed_bill(bale, session_factory, user.id, parsed.chat_id, arg)
             return
 
         current = await wizard.current_step(user.id)
@@ -138,6 +130,13 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
                 return
             else:
                 await wizard.abandon(user.id)
+
+        # A bare bill id typed in (after tapping "قبض من", or pasted directly) looks
+        # like ordinary text, so route it to the billing service before the LLM agent —
+        # the agent has no bill-lookup tool and would deflect it as off-domain.
+        if _looks_like_bill_id(text):
+            await _process_typed_bill(bale, session_factory, user.id, parsed.chat_id, text)
+            return
 
         await _reply_with_agent(bale, user, parsed.chat_id, text, session_factory)
 
@@ -232,6 +231,29 @@ async def _send_web(bale, session, user, chat_id) -> None:
 
 async def _send_bill_prompt(bale, chat_id) -> None:
     await bale.send_message(chat_id=chat_id, text="شناسه قبض را بفرست یا عکس قبض را ارسال کن.")
+
+
+def _looks_like_bill_id(text: str) -> bool:
+    # True only when the message parses to a valid شناسه قبض (Iranian mod-11 checksum),
+    # so normal conversation isn't mistaken for a bill lookup.
+    from energybot.billing.bill_numbers import parse_bill_numbers
+    try:
+        parse_bill_numbers(text)
+        return True
+    except ValueError:
+        return False
+
+
+async def _process_typed_bill(bale, session_factory, user_id, chat_id, arg) -> None:
+    try:
+        svc = build_billing_service(session_factory)
+        res = await svc.handle_input(user_id, text=arg)
+    except Exception:
+        from energybot.logging import get_logger
+        get_logger(__name__).exception("bill_command_failed", chat_id=chat_id)
+        await bale.send_message(chat_id=chat_id, text="متأسفم، در پردازش قبض مشکلی پیش اومد. بعداً دوباره امتحان کن.")
+        return
+    await _send_capture(bale, chat_id, res)
 
 
 async def _reply_with_agent(bale, user, chat_id, text, session_factory) -> None:

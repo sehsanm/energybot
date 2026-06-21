@@ -58,6 +58,20 @@ async def test_typed_bill_id_creates_snapshot_with_pay_button(db_session, monkey
 
 
 @pytest.mark.asyncio
+async def test_bare_bill_id_text_creates_snapshot_with_pay_button(db_session, monkeypatch):
+    # User taps "قبض من", then types just the bill id (no /bill prefix). It must be
+    # routed to the billing service, not the LLM agent.
+    bale = FakeBale()
+    monkeypatch.setattr("energybot.bale_adapter.handler.get_bale_client", lambda: bale)
+    u = await _seed_done_user(db_session, 31004)
+    upd = {"update_id": 5, "message": {"message_id": 5, "from": {"id": 31004}, "chat": {"id": 31004}, "text": _bill_id()}}
+    await handle_bale_update(upd, session_factory=lambda: db_session)
+    bills = (await db_session.execute(select(Bill).where(Bill.user_id == u.id))).scalars().all()
+    assert len(bills) == 1
+    assert any(s["reply_markup"] for s in bale.sent)  # pay button present
+
+
+@pytest.mark.asyncio
 async def test_photo_without_barcode_asks_for_manual(db_session, monkeypatch):
     bale = FakeBale()
     monkeypatch.setattr("energybot.bale_adapter.handler.get_bale_client", lambda: bale)
