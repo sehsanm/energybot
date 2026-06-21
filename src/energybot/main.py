@@ -3,6 +3,7 @@ import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from starlette.responses import RedirectResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.types import Scope
 from energybot.health import router as health_router
@@ -114,11 +115,21 @@ def create_app() -> FastAPI:
     app.include_router(user_dashboard_router)
     app.include_router(metrics_router)
     app.include_router(pay_router)
+    # StaticFiles redirects missing trailing slashes on sub-paths but not on the
+    # bare mount root, so `/app` would 404 while `/app/` works. Add explicit
+    # canonical redirects (registered before the mount so they match first).
+    def _slash_redirect(target: str):
+        async def _r(_request):
+            return RedirectResponse(url=target, status_code=308)
+        return _r
+
     static_dir = os.environ.get("ENERGYBOT_ADMIN_STATIC_DIR", "admin_ui/out")
     if os.path.isdir(static_dir):
+        app.add_route("/admin", _slash_redirect("/admin/"))
         app.mount("/admin", _AdminSpaStatic(directory=static_dir, html=True), name="admin")
     app_dir = os.environ.get("ENERGYBOT_APP_STATIC_DIR", "app_ui/out")
     if os.path.isdir(app_dir):
+        app.add_route("/app", _slash_redirect("/app/"))
         app.mount("/app", StaticFiles(directory=app_dir, html=True), name="app")
     landing_dir = os.environ.get("ENERGYBOT_LANDING_STATIC_DIR", "landing_ui/out")
     if os.path.isdir(landing_dir):
