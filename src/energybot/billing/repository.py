@@ -35,10 +35,18 @@ class BillingRepository:
 
     async def add_bill(self, user_id: UUID, subscription_id: UUID, detail: BillDetail) -> Bill:
         s = self._session_factory()
+        details = detail.details or {}
+        amounts = details.get("amounts") or {}
+        consumption = details.get("consumption") or {}
+        period = amounts.get("period")
+        amount = int(period) if period is not None else int(detail.amount)
+        total_kwh = consumption.get("total")
         bill = Bill(
             user_id=user_id, subscription_id=subscription_id, utility_type=detail.utility_type,
-            pay_id=detail.pay_id, amount=detail.amount, term=detail.term,
-            due_date=_parse_due(detail.due_date), status="inquired", raw_inquiry=detail.raw,
+            pay_id=detail.pay_id, amount=amount, term=detail.term,
+            consumption=(float(total_kwh) if total_kwh is not None else None),
+            due_date=_parse_due(detail.due_date), status="inquired",
+            raw_inquiry=detail.raw, details=details,
         )
         s.add(bill)
         await s.commit()
@@ -88,6 +96,20 @@ class BillingRepository:
         return (await s.execute(
             select(Bill).where(Bill.id == bill_id)
         )).scalar_one_or_none()
+
+    async def find_bill_by_bill_id(self, user_id: UUID, bill_id: str) -> Bill | None:
+        s = self._session_factory()
+        return (await s.execute(
+            select(Bill)
+            .join(UtilitySubscription, UtilitySubscription.id == Bill.subscription_id)
+            .where(
+                UtilitySubscription.user_id == user_id,
+                UtilitySubscription.bill_id == bill_id,
+                UtilitySubscription.deleted_at.is_(None),
+            )
+            .order_by(Bill.inquired_at.desc(), Bill.id.desc())
+            .limit(1)
+        )).scalars().first()
 
     async def recent_bills(self, user_id: UUID, limit: int = 12) -> list[Bill]:
         s = self._session_factory()
