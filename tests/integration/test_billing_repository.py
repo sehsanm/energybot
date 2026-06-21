@@ -118,6 +118,9 @@ async def test_find_bill_by_bill_id_returns_stored_or_none(db_session):
         term=None, due_date=None, raw={}, details={}))
     found = await repo.find_bill_by_bill_id(u.id, "9706459904126")
     assert found is not None and found.utility_type == "electricity"
+    # Isolation: a different user must NOT see the first user's cached bill.
+    other = await _user(db_session)
+    assert await repo.find_bill_by_bill_id(other.id, "9706459904126") is None
 
 
 @pytest.mark.asyncio
