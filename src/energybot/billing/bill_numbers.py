@@ -33,18 +33,24 @@ def is_valid_bill_id(bill_id: str) -> bool:
     return _check_digit(bill_id[:-1]) == bill_id[-1]
 
 
+# Iranian شناسه‌قبض standard: the last digit is a checksum and the digit
+# immediately before it ("کد نوع خدمت") identifies the service. Verified against
+# real bills, e.g. ...12|6 → "2" → electricity.
+_SERVICE_TYPE_CODES = {
+    "1": "water",
+    "2": "electricity",
+    "3": "gas",
+    "4": "tel",
+    "5": "mobile",
+    "6": "municipality",
+}
+
+
 def utility_type_for(bill_id: str) -> str:
-    # Company/service code is encoded in the leading digits of the bill id.
-    # Gas company codes commonly start with regions billed by NIGC; electricity by Tavanir.
-    # Defensive: when undetermined, return "unknown" and let the Finnotech response decide.
-    if not bill_id.isdigit():
+    # Service type is the 2nd-from-last digit of the bill id (see standard above).
+    if not bill_id.isdigit() or len(bill_id) < 2:
         return "unknown"
-    head = bill_id[0]
-    if head == "1":
-        return "electricity"
-    if head == "2":
-        return "gas"
-    return "unknown"
+    return _SERVICE_TYPE_CODES.get(bill_id[-2], "unknown")
 
 
 def parse_bill_numbers(raw: str) -> BillNumbers:

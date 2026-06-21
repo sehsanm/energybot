@@ -28,7 +28,8 @@ def _fmt_amount(rial: int) -> str:
 
 
 def render_summary(detail: BillDetail) -> str:
-    kind = {"electricity": "برق", "gas": "گاز"}.get(detail.utility_type, "قبض")
+    kind = {"electricity": "برق", "gas": "گاز", "water": "آب",
+            "tel": "تلفن", "mobile": "موبایل"}.get(detail.utility_type, "قبض")
     lines = [f"📄 قبض {kind}", f"مبلغ: {_fmt_amount(detail.amount)}"]
     if detail.term:
         lines.append(f"دوره: {detail.term}")

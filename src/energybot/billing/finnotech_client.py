@@ -22,13 +22,22 @@ class FinnotechError(Exception):
     pass
 
 
-def _normalise_type(value: str | None, bill_id: str) -> str:
-    v = (value or "").strip().lower()
-    if "elec" in v or "برق" in v:
-        return "electricity"
-    if "gas" in v or "گاز" in v:
-        return "gas"
-    return utility_type_for(bill_id)
+# Maps our internal utility type to the Finnotech detailBillingInquiry `type`
+# enum. Energy bills (water/electricity/gas) are the supported core; undetermined
+# ids fall back to Electricity, the most common inquiry for this bot.
+_FINNOTECH_TYPE = {
+    "water": "Water",
+    "electricity": "Electricity",
+    "gas": "Gas",
+    "tel": "Tel",
+    "mobile": "Mobile",
+    "municipality": "Municipality",
+}
+
+
+def _finnotech_type_for(bill_id: str) -> tuple[str, str]:
+    utype = utility_type_for(bill_id)
+    return utype, _FINNOTECH_TYPE.get(utype, "Electricity")
 
 
 class FinnotechClient:
@@ -76,7 +85,10 @@ class FinnotechClient:
     async def inquire_bill(self, bill_id: str) -> BillDetail:
         token = await self._ensure_token()
         path = self._inquiry_path.format(client_id=self._client_id)
-        params = {"billId": bill_id, "trackId": uuid.uuid4().hex}
+        utype, fin_type = _finnotech_type_for(bill_id)
+        # detailBillingInquiry takes the bill identifier as `parameter` plus the
+        # service `type`; the older billId-only form is rejected as a bad URL.
+        params = {"type": fin_type, "parameter": bill_id, "trackId": uuid.uuid4().hex}
         try:
             r = await self._client.get(
                 f"{self._base}{path}", params=params,
@@ -90,15 +102,22 @@ class FinnotechClient:
         if str(data.get("status", "")).upper() not in ("DONE", "OK", "SUCCESS"):
             raise FinnotechError(f"inquiry failed: status={data.get('status')} code={(data.get('error') or {}).get('code')}")
         result = data.get("result") or {}
-        amount_raw = result.get("amount") or result.get("billAmount") or 0
+        # A DONE response with no Amount means "قبضی یافت نشد" (no bill matched).
+        amount_raw = result.get("Amount") or result.get("amount") or result.get("billAmount")
+        if amount_raw is None:
+            raise FinnotechError(f"inquiry empty: {result.get('message') or 'no bill found'}")
+        info = result.get("Info") or {}
+        year, period = info.get("Year"), info.get("Period")
+        term = f"{year}/{period}" if year and period else (result.get("term") or result.get("period"))
+        pay_id = (result.get("PayId") or result.get("payId")
+                  or result.get("paymentId"))
         return BillDetail(
-            bill_id=str(result.get("billId") or bill_id),
-            pay_id=(str(result["paymentId"]) if result.get("paymentId") else
-                    (str(result["payId"]) if result.get("payId") else None)),
+            bill_id=str(result.get("BillId") or result.get("billId") or bill_id),
+            pay_id=str(pay_id) if pay_id else None,
             amount=int(str(amount_raw).replace(",", "") or 0),
-            utility_type=_normalise_type(result.get("billType") or result.get("type"), bill_id),
-            term=result.get("term") or result.get("period"),
-            due_date=result.get("dueDate") or result.get("paymentDeadLine"),
+            utility_type=utype,
+            term=term,
+            due_date=result.get("Date") or result.get("dueDate") or result.get("paymentDeadLine"),
             raw=data,
         )
 

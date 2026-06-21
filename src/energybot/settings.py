@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     finnotech_scope: str = "billing:cc-inquiry-detail:get"
     finnotech_base_url: str = "https://apibeta.finnotech.ir"
     finnotech_token_path: str = "/dev/v2/oauth2/token"
-    finnotech_inquiry_path: str = "/billing/v2/clients/{client_id}/billInquiry"
+    finnotech_inquiry_path: str = "/billing/v2/clients/{client_id}/detailBillingInquiry"
 
     # Payment gateway (redirect)
     payment_provider: str = "generic"  # generic | finnotech

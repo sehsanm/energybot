@@ -37,10 +37,11 @@ def test_is_valid_bill_id():
     assert is_valid_bill_id("0000000000000") is False
 
 
-def test_utility_type_returns_known_value():
-    # Branch 1: head "1" → "electricity"
-    assert utility_type_for(VALID_BILL_ID) == "electricity"
-    # Branch 2: head "2" → "gas"
-    assert utility_type_for("2000000000000") == "gas"
-    # Branch 3: head other → "unknown"
-    assert utility_type_for("9000000000000") == "unknown"
+def test_utility_type_from_service_code_digit():
+    # Service type = 2nd-from-last digit (last is checksum).
+    assert utility_type_for("0000000011") == "water"        # code 1
+    assert utility_type_for("0000000021") == "electricity"  # code 2
+    assert utility_type_for("0000000031") == "gas"          # code 3
+    assert utility_type_for("0000000091") == "unknown"      # unmapped
+    # Real electricity bill ...12|6 → code 2.
+    assert utility_type_for("9706459904126") == "electricity"
