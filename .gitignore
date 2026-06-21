@@ -17,6 +17,9 @@ dist/
 build/
 .DS_Store
 *.log
+# Real customer bill PDFs (PII) must never be committed; tests use a redacted
+# barcode-only fixture under tests/fixtures/ instead.
+/BILL_*.pdf
 /var/lib/energybot/
 /data/
 .deploy/wheels/
