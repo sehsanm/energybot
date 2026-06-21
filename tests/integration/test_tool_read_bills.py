@@ -32,3 +32,19 @@ async def test_read_bills_returns_trend(db_session):
     assert len(out["bills"]) == 2
     assert out["trend"]["electricity"]["latest"] == 130000
     assert out["trend"]["electricity"]["delta"] == 30000
+
+
+@pytest.mark.asyncio
+async def test_read_bills_includes_details(db_session):
+    from energybot.billing.repository import BillingRepository
+    from energybot.billing.finnotech_client import BillDetail
+    from energybot.agent.tools.read_bills import ReadBillsTool
+    repo = BillingRepository(session_factory=lambda: db_session)
+    u = await _user(db_session)  # file's existing helper
+    sub = await repo.get_or_create_subscription(u.id, utility_type="electricity", bill_id="9706459904126")
+    await repo.add_bill(u.id, sub.id, BillDetail(
+        bill_id="9706459904126", pay_id="649250240", amount=6492000,
+        utility_type="electricity", term="1405/2", due_date=None, raw={},
+        details={"amounts": {"period": 10775136}, "consumption": {"total": 675}}))
+    out = await ReadBillsTool(repo=repo, user_id=u.id).invoke({})
+    assert out["bills"][0]["details"]["consumption"]["total"] == 675

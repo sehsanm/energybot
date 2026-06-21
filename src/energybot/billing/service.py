@@ -22,20 +22,55 @@ class CaptureResult:
     error: str | None
 
 
+def _to_persian_digits(s: str) -> str:
+    return s.translate(str.maketrans("0123456789,", "۰۱۲۳۴۵۶۷۸۹٬"))
+
+
 def _fmt_amount(rial: int) -> str:
-    toman = rial // 10
-    return f"{toman:,} تومان"
+    toman = int(rial) // 10
+    return _to_persian_digits(f"{toman:,}") + " تومان"
+
+
+def _fmt_kwh(v) -> str:
+    if float(v).is_integer():
+        return _to_persian_digits(f"{int(v):,}")
+    # Fractional kWh: use the Persian decimal separator, not an ASCII dot.
+    return _to_persian_digits(f"{v:,.1f}").replace(".", "٫")
+
+
+def render_bill_summary(*, utility_type: str, amount: int, term: str | None, details: dict) -> str:
+    kind = {"electricity": "برق", "gas": "گاز", "water": "آب",
+            "tel": "تلفن", "mobile": "موبایل"}.get(utility_type, "قبض")
+    details = details or {}
+    amounts = details.get("amounts") or {}
+    period_cost = amounts.get("period")
+    headline = int(period_cost) if period_cost is not None else int(amount)
+    lines = [f"📄 قبض {kind}", f"مبلغ این دوره: {_fmt_amount(headline)}"]
+    debt = amounts.get("previous_debt")
+    if debt and int(debt) > 0:
+        lines.append(f"بدهی قبلی: {_fmt_amount(int(debt))}")
+        payable = amounts.get("payable")
+        if payable:
+            lines.append(f"قابل پرداخت: {_fmt_amount(int(payable))}")
+    if term:
+        lines.append(f"دوره: {term}")
+    total = (details.get("consumption") or {}).get("total")
+    if total is not None:
+        lines.append(f"مصرف دوره: {_fmt_kwh(total)} کیلووات‌ساعت")
+    due = details.get("due_date")
+    if due:
+        lines.append(f"مهلت پرداخت: {due}")
+    return "\n".join(lines)
+
+
+def render_bill(obj) -> str:
+    return render_bill_summary(
+        utility_type=obj.utility_type, amount=int(obj.amount),
+        term=obj.term, details=getattr(obj, "details", None) or {})
 
 
 def render_summary(detail: BillDetail) -> str:
-    kind = {"electricity": "برق", "gas": "گاز", "water": "آب",
-            "tel": "تلفن", "mobile": "موبایل"}.get(detail.utility_type, "قبض")
-    lines = [f"📄 قبض {kind}", f"مبلغ: {_fmt_amount(detail.amount)}"]
-    if detail.term:
-        lines.append(f"دوره: {detail.term}")
-    if detail.due_date:
-        lines.append(f"مهلت پرداخت: {detail.due_date}")
-    return "\n".join(lines)
+    return render_bill(detail)
 
 
 class BillingService:
@@ -63,6 +98,11 @@ class BillingService:
         if bn is None:
             msg = _MANUAL_HINT if image_bytes is not None else _BAD_INPUT
             return CaptureResult(False, "", None, None, msg)
+        cached = await self._repo.find_bill_by_bill_id(user_id, bn.bill_id)
+        if cached is not None:
+            return CaptureResult(
+                ok=True, summary=render_bill(cached),
+                pay_callback=f"pay:{cached.id}", bill_db_id=str(cached.id), error=None)
         try:
             detail = await self._fin.inquire_bill(bn.bill_id)
         except FinnotechError as e:
@@ -72,7 +112,7 @@ class BillingService:
             user_id, utility_type=detail.utility_type, bill_id=bn.bill_id)
         bill = await self._repo.add_bill(user_id, sub.id, detail)
         return CaptureResult(
-            ok=True, summary=render_summary(detail),
+            ok=True, summary=render_bill(bill),
             pay_callback=f"pay:{bill.id}", bill_db_id=str(bill.id), error=None,
         )
 
@@ -86,12 +126,14 @@ class BillingService:
         return_url = f"{self._callback_base}/pay/callback"
         # bill_id here is the gateway-facing identifier used only in the payment
         # description/metadata; the pay_id (شناسه‌پرداخت) is the meaningful value.
+        amounts = (bill.details or {}).get("amounts") or {}
+        charge = int(amounts.get("pay_amount") or bill.amount)
         session = await self._pay.create_session(
-            amount=int(bill.amount), bill_id=sub.bill_id,
+            amount=charge, bill_id=sub.bill_id,
             pay_id=bill.pay_id, return_url=return_url)
         await self._repo.create_payment(
             user_id, bill_db_id=bill.id, chat_id=chat_id, provider=self._provider_name,
-            amount=int(bill.amount), session=session)
+            amount=charge, session=session)
         return session.redirect_url
 
     async def complete_payment(self, gateway_ref: str, params: dict) -> tuple[int, bool]:

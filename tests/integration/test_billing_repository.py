@@ -89,6 +89,41 @@ async def test_recent_bills_excludes_soft_deleted_user(db_session):
 
 
 @pytest.mark.asyncio
+async def test_add_bill_stores_details_and_period_amount(db_session):
+    from energybot.billing.finnotech_client import BillDetail
+    repo = BillingRepository(session_factory=lambda: db_session)
+    u = await _user(db_session)  # use the file's existing user helper
+    sub = await repo.get_or_create_subscription(u.id, utility_type="electricity", bill_id="9706459904126")
+    detail = BillDetail(
+        bill_id="9706459904126", pay_id="649250240", amount=6492000,
+        utility_type="electricity", term="1405/2", due_date="1405/03/31", raw={},
+        details={"amounts": {"period": 10775136, "pay_amount": 6492000},
+                 "consumption": {"total": 675, "unit": "kWh"}},
+    )
+    bill = await repo.add_bill(u.id, sub.id, detail)
+    assert int(bill.amount) == 10775136          # period cost, not pay_amount
+    assert float(bill.consumption) == 675.0
+    assert bill.details["amounts"]["pay_amount"] == 6492000
+
+
+@pytest.mark.asyncio
+async def test_find_bill_by_bill_id_returns_stored_or_none(db_session):
+    repo = BillingRepository(session_factory=lambda: db_session)
+    u = await _user(db_session)
+    assert await repo.find_bill_by_bill_id(u.id, "9706459904126") is None
+    sub = await repo.get_or_create_subscription(u.id, utility_type="electricity", bill_id="9706459904126")
+    from energybot.billing.finnotech_client import BillDetail
+    await repo.add_bill(u.id, sub.id, BillDetail(
+        bill_id="9706459904126", pay_id=None, amount=100, utility_type="electricity",
+        term=None, due_date=None, raw={}, details={}))
+    found = await repo.find_bill_by_bill_id(u.id, "9706459904126")
+    assert found is not None and found.utility_type == "electricity"
+    # Isolation: a different user must NOT see the first user's cached bill.
+    other = await _user(db_session)
+    assert await repo.find_bill_by_bill_id(other.id, "9706459904126") is None
+
+
+@pytest.mark.asyncio
 async def test_recent_bills_orders_desc(db_session):
     u = await _user(db_session)
     repo = BillingRepository(session_factory=lambda: db_session)

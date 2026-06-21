@@ -1,10 +1,11 @@
 import base64
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 import httpx
 from energybot.billing.bill_numbers import utility_type_for
+from energybot.billing.bill_details import parse_bill_details
 
 
 @dataclass(slots=True)
@@ -16,6 +17,7 @@ class BillDetail:
     term: str | None
     due_date: str | None
     raw: dict
+    details: dict = field(default_factory=dict)
 
 
 class FinnotechError(Exception):
@@ -119,6 +121,7 @@ class FinnotechClient:
             term=term,
             due_date=result.get("Date") or result.get("dueDate") or result.get("paymentDeadLine"),
             raw=data,
+            details=parse_bill_details(utype, data),
         )
 
 
