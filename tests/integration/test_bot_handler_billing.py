@@ -83,6 +83,29 @@ async def test_photo_without_barcode_asks_for_manual(db_session, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_pdf_document_without_barcode_asks_for_manual(db_session, monkeypatch):
+    bale = FakeBale()
+    monkeypatch.setattr("energybot.bale_adapter.handler.get_bale_client", lambda: bale)
+    await _seed_done_user(db_session, 31005)
+    upd = {"update_id": 6, "message": {"message_id": 6, "from": {"id": 31005}, "chat": {"id": 31005},
+           "document": {"file_id": "doc", "file_name": "bill.pdf", "mime_type": "application/pdf"}}}
+    await handle_bale_update(upd, session_factory=lambda: db_session)
+    assert any("بارکد" in s["text"] for s in bale.sent)
+
+
+@pytest.mark.asyncio
+async def test_unsupported_document_type_is_rejected(db_session, monkeypatch):
+    bale = FakeBale()
+    monkeypatch.setattr("energybot.bale_adapter.handler.get_bale_client", lambda: bale)
+    await _seed_done_user(db_session, 31006)
+    upd = {"update_id": 7, "message": {"message_id": 7, "from": {"id": 31006}, "chat": {"id": 31006},
+           "document": {"file_id": "doc", "file_name": "notes.docx",
+                        "mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"}}}
+    await handle_bale_update(upd, session_factory=lambda: db_session)
+    assert any("PDF" in s["text"] for s in bale.sent)
+
+
+@pytest.mark.asyncio
 async def test_pay_callback_sends_pay_link(db_session, monkeypatch):
     bale = FakeBale()
     monkeypatch.setattr("energybot.bale_adapter.handler.get_bale_client", lambda: bale)

@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from energybot.bale_adapter.client import BaleClient
 from energybot.bale_adapter.commands import is_command, is_wizard_answer
-from energybot.bale_adapter.parser import parse_update, UpdateText, UpdateCallback, UpdatePhoto, UpdateUnknown
+from energybot.bale_adapter.parser import parse_update, UpdateText, UpdateCallback, UpdatePhoto, UpdateDocument, UpdateUnknown
 from energybot.core.models import User, Profile, OnboardingState
 from energybot.profile.repository import ProfileRepository
 from energybot.profile.wizard import WizardEngine
@@ -154,6 +154,10 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
         await _send_capture(bale, parsed.chat_id, res)
         return
 
+    elif isinstance(parsed, UpdateDocument):
+        await _handle_bill_document(bale, session_factory, user.id, parsed)
+        return
+
     elif isinstance(parsed, UpdateCallback):
         await bale.answer_callback_query(callback_query_id=parsed.callback_id)
         if parsed.data.startswith("act:"):
@@ -230,7 +234,33 @@ async def _send_web(bale, session, user, chat_id) -> None:
 
 
 async def _send_bill_prompt(bale, chat_id) -> None:
-    await bale.send_message(chat_id=chat_id, text="شناسه قبض را بفرست یا عکس قبض را ارسال کن.")
+    await bale.send_message(chat_id=chat_id, text="شناسه قبض را بفرست یا عکس یا فایل PDF قبض را ارسال کن.")
+
+
+async def _handle_bill_document(bale, session_factory, user_id, parsed) -> None:
+    mime = (parsed.mime_type or "").lower()
+    name = (parsed.file_name or "").lower()
+    is_pdf = mime == "application/pdf" or name.endswith(".pdf")
+    # Photos sent "as file" arrive as documents with an image mime; route them
+    # through the image pipeline rather than rejecting them.
+    is_image = mime.startswith("image/")
+    if not (is_pdf or is_image):
+        await bale.send_message(chat_id=parsed.chat_id, text="فقط می‌تونم عکس یا فایل PDF قبض را بررسی کنم.")
+        return
+    try:
+        file_path = await bale.get_file(parsed.file_id)
+        data = await bale.download_file(file_path)
+        svc = build_billing_service(session_factory)
+        if is_pdf:
+            res = await svc.handle_input(user_id, pdf_bytes=data)
+        else:
+            res = await svc.handle_input(user_id, image_bytes=data)
+    except Exception:
+        from energybot.logging import get_logger
+        get_logger(__name__).exception("document_billing_failed", chat_id=parsed.chat_id)
+        await bale.send_message(chat_id=parsed.chat_id, text="نتونستم فایل را پردازش کنم. دوباره امتحان کن.")
+        return
+    await _send_capture(bale, parsed.chat_id, res)
 
 
 def _looks_like_bill_id(text: str) -> bool:
