@@ -1,6 +1,6 @@
 import asyncio
 import pytest
-from energybot.bale_adapter.parser import parse_update, UpdateText, UpdateCallback, UpdatePhoto
+from energybot.bale_adapter.parser import parse_update, UpdateText, UpdateCallback, UpdatePhoto, UpdateDocument
 from energybot.bale_adapter.serialization import PerUserLock
 
 
@@ -29,6 +29,18 @@ def test_parse_photo_message():
     assert isinstance(parsed, UpdatePhoto)
     assert parsed.file_id == "big"
     assert parsed.caption == "قبض"
+
+
+def test_parse_document_message():
+    upd = {"update_id": 10, "message": {"message_id": 4, "from": {"id": 8, "first_name": "نگار"},
+           "chat": {"id": 8}, "document": {"file_id": "doc1", "file_name": "bill.pdf",
+           "mime_type": "application/pdf"}, "caption": "قبض من"}}
+    parsed = parse_update(upd)
+    assert isinstance(parsed, UpdateDocument)
+    assert parsed.file_id == "doc1"
+    assert parsed.mime_type == "application/pdf"
+    assert parsed.file_name == "bill.pdf"
+    assert parsed.caption == "قبض من"
 
 
 @pytest.mark.asyncio

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from uuid import UUID
 from energybot.billing.barcode import decode_bill_barcode
+from energybot.billing.pdf import decode_bill_from_pdf
 from energybot.billing.bill_numbers import parse_bill_numbers, BillNumbers
 from energybot.billing.finnotech_client import BillDetail, FinnotechError
 from energybot.billing.repository import BillingRepository
@@ -82,7 +83,10 @@ class BillingService:
         self._callback_base = callback_base_url.rstrip("/")
         self._provider_name = provider_name
 
-    def _capture_numbers(self, *, image_bytes: bytes | None, text: str | None) -> BillNumbers | None:
+    def _capture_numbers(self, *, image_bytes: bytes | None, pdf_bytes: bytes | None,
+                         text: str | None) -> BillNumbers | None:
+        if pdf_bytes is not None:
+            return decode_bill_from_pdf(pdf_bytes)
         if image_bytes is not None:
             return decode_bill_barcode(image_bytes)
         if text:
@@ -93,10 +97,10 @@ class BillingService:
         return None
 
     async def handle_input(self, user_id: UUID, *, image_bytes: bytes | None = None,
-                           text: str | None = None) -> CaptureResult:
-        bn = self._capture_numbers(image_bytes=image_bytes, text=text)
+                           pdf_bytes: bytes | None = None, text: str | None = None) -> CaptureResult:
+        bn = self._capture_numbers(image_bytes=image_bytes, pdf_bytes=pdf_bytes, text=text)
         if bn is None:
-            msg = _MANUAL_HINT if image_bytes is not None else _BAD_INPUT
+            msg = _MANUAL_HINT if (image_bytes is not None or pdf_bytes is not None) else _BAD_INPUT
             return CaptureResult(False, "", None, None, msg)
         cached = await self._repo.find_bill_by_bill_id(user_id, bn.bill_id)
         if cached is not None:
