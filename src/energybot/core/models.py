@@ -277,6 +277,7 @@ class Bill(Base):
     due_date: Mapped[_date | None] = mapped_column(Date)
     status: Mapped[str] = mapped_column(String(20), server_default=text("'inquired'"), nullable=False)
     raw_inquiry: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    details: Mapped[dict] = mapped_column(JSONB, default=dict, server_default=text("'{}'"), nullable=False)
     inquired_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
     __table_args__ = (Index("ix_bills_user_inquired", "user_id", "inquired_at"),)
 
