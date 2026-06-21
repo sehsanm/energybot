@@ -82,3 +82,25 @@ async def test_bill_not_found_raises():
     c = _client(handler)
     with pytest.raises(FinnotechError):
         await c.inquire_bill(ELEC_BILL)
+
+
+@pytest.mark.asyncio
+async def test_inquire_bill_populates_details():
+    def handler(request):
+        if request.url.path.endswith("/oauth2/token"):
+            return httpx.Response(200, json={"result": {"value": "TOK", "lifeTime": 3600000}, "status": "DONE"})
+        return httpx.Response(200, json={"status": "DONE", "result": {
+            "Amount": "6492000", "BillId": ELEC_BILL, "PayId": "649250240",
+            "Date": "1405/03/31",
+            "Info": {"TariffType": "خانگی", "Period": "2", "Year": "1405",
+                     "NormalConsumption": "366", "PeakConsumption": "136",
+                     "LowConsumption": "173", "FridayConsumption": "0",
+                     "PeriodAmount": "10775136", "PreviousDebt": "6497683"},
+        }})
+
+    c = _client(handler)
+    d = await c.inquire_bill(ELEC_BILL)
+    assert d.details["tariff"] == "خانگی"
+    assert d.details["consumption"]["total"] == 675
+    assert d.details["amounts"]["period"] == 10775136
+    assert d.amount == 6492000  # top-level Amount unchanged on BillDetail
