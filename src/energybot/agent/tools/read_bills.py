@@ -17,6 +17,7 @@ class ReadBillsTool:
         items = [{
             "utility_type": b.utility_type, "amount": int(b.amount), "term": b.term,
             "status": b.status, "inquired_at": b.inquired_at.isoformat(),
+            "details": b.details,
         } for b in bills]
         trend: dict[str, Any] = {}
         for kind in ("electricity", "gas"):
