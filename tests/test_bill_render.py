@@ -31,3 +31,15 @@ def test_cached_bill_and_fresh_detail_render_identically():
     fresh = _Obj(); fresh.amount = 6492000          # BillDetail-like (pay_amount)
     cached = _Obj(); cached.amount = 10775136        # Bill-like (period stored)
     assert render_bill(fresh) == render_bill(cached)  # both derive period from details
+
+
+def test_headline_falls_back_to_amount_without_period():
+    out = render_bill_summary(utility_type="gas", amount=500000, term="1405/2", details={})
+    assert "قبض گاز" in out
+    assert "مبلغ این دوره" in out and "۵۰٬۰۰۰ تومان" in out
+
+
+def test_fractional_kwh_renders_persian_decimal():
+    out = render_bill_summary(utility_type="electricity", amount=1, term=None,
+                              details={"consumption": {"total": 12.5}})
+    assert "۱۲٫۵ کیلووات‌ساعت" in out

@@ -32,8 +32,10 @@ def _fmt_amount(rial: int) -> str:
 
 
 def _fmt_kwh(v) -> str:
-    n = int(v) if float(v).is_integer() else v
-    return _to_persian_digits(f"{n:,}")
+    if float(v).is_integer():
+        return _to_persian_digits(f"{int(v):,}")
+    # Fractional kWh: use the Persian decimal separator, not an ASCII dot.
+    return _to_persian_digits(f"{v:,.1f}").replace(".", "٫")
 
 
 def render_bill_summary(*, utility_type: str, amount: int, term: str | None, details: dict) -> str:
