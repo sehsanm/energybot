@@ -98,6 +98,11 @@ class BillingService:
         if bn is None:
             msg = _MANUAL_HINT if image_bytes is not None else _BAD_INPUT
             return CaptureResult(False, "", None, None, msg)
+        cached = await self._repo.find_bill_by_bill_id(user_id, bn.bill_id)
+        if cached is not None:
+            return CaptureResult(
+                ok=True, summary=render_bill(cached),
+                pay_callback=f"pay:{cached.id}", bill_db_id=str(cached.id), error=None)
         try:
             detail = await self._fin.inquire_bill(bn.bill_id)
         except FinnotechError as e:
@@ -107,7 +112,7 @@ class BillingService:
             user_id, utility_type=detail.utility_type, bill_id=bn.bill_id)
         bill = await self._repo.add_bill(user_id, sub.id, detail)
         return CaptureResult(
-            ok=True, summary=render_summary(detail),
+            ok=True, summary=render_bill(bill),
             pay_callback=f"pay:{bill.id}", bill_db_id=str(bill.id), error=None,
         )
 
@@ -121,12 +126,14 @@ class BillingService:
         return_url = f"{self._callback_base}/pay/callback"
         # bill_id here is the gateway-facing identifier used only in the payment
         # description/metadata; the pay_id (شناسه‌پرداخت) is the meaningful value.
+        amounts = (bill.details or {}).get("amounts") or {}
+        charge = int(amounts.get("pay_amount") or bill.amount)
         session = await self._pay.create_session(
-            amount=int(bill.amount), bill_id=sub.bill_id,
+            amount=charge, bill_id=sub.bill_id,
             pay_id=bill.pay_id, return_url=return_url)
         await self._repo.create_payment(
             user_id, bill_db_id=bill.id, chat_id=chat_id, provider=self._provider_name,
-            amount=int(bill.amount), session=session)
+            amount=charge, session=session)
         return session.redirect_url
 
     async def complete_payment(self, gateway_ref: str, params: dict) -> tuple[int, bool]:
