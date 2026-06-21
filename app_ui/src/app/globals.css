@@ -46,6 +46,11 @@
     --sidebar-accent-foreground: 0 0% 100%;
     --sidebar-border: 217 33% 17%;
 
+    /* data-viz palette (blue → amber energy ramp) */
+    --chart-1: 221 83% 45%;
+    --chart-2: 32 95% 50%;
+    --chart-grid: 214 32% 90%;
+
     --radius: 0.625rem;
   }
 
@@ -89,6 +94,10 @@
     --sidebar-accent: 221 83% 53%;
     --sidebar-accent-foreground: 0 0% 100%;
     --sidebar-border: 217 33% 12%;
+
+    --chart-1: 217 91% 62%;
+    --chart-2: 32 95% 58%;
+    --chart-grid: 217 33% 18%;
   }
 
   * {
@@ -102,6 +111,11 @@
 
   body {
     font-family: Vazirmatn, "Fira Sans", -apple-system, system-ui, sans-serif;
+    /* subtle two-tone wash so flat surfaces read as depth, not emptiness */
+    background-image:
+      radial-gradient(60rem 60rem at 100% -10%, hsl(var(--secondary) / 0.06), transparent 60%),
+      radial-gradient(50rem 50rem at 0% 0%, hsl(var(--accent) / 0.05), transparent 55%);
+    background-attachment: fixed;
   }
 
   /* tabular figures for data columns / timers */
@@ -119,6 +133,16 @@
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 999px; }
   ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.5); }
+
+  /* honor users who ask for less motion */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
 
 @layer utilities {
@@ -127,5 +151,9 @@
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
+  }
+  /* soft elevation used for floating surfaces (dropdowns, sticky bars) */
+  .shadow-elevated {
+    box-shadow: 0 1px 2px hsl(222 47% 11% / 0.04), 0 8px 24px hsl(222 47% 11% / 0.08);
   }
 }
