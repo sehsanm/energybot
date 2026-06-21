@@ -22,20 +22,53 @@ class CaptureResult:
     error: str | None
 
 
+def _to_persian_digits(s: str) -> str:
+    return s.translate(str.maketrans("0123456789,", "۰۱۲۳۴۵۶۷۸۹٬"))
+
+
 def _fmt_amount(rial: int) -> str:
-    toman = rial // 10
-    return f"{toman:,} تومان"
+    toman = int(rial) // 10
+    return _to_persian_digits(f"{toman:,}") + " تومان"
+
+
+def _fmt_kwh(v) -> str:
+    n = int(v) if float(v).is_integer() else v
+    return _to_persian_digits(f"{n:,}")
+
+
+def render_bill_summary(*, utility_type: str, amount: int, term: str | None, details: dict) -> str:
+    kind = {"electricity": "برق", "gas": "گاز", "water": "آب",
+            "tel": "تلفن", "mobile": "موبایل"}.get(utility_type, "قبض")
+    details = details or {}
+    amounts = details.get("amounts") or {}
+    period_cost = amounts.get("period")
+    headline = int(period_cost) if period_cost is not None else int(amount)
+    lines = [f"📄 قبض {kind}", f"مبلغ این دوره: {_fmt_amount(headline)}"]
+    debt = amounts.get("previous_debt")
+    if debt and int(debt) > 0:
+        lines.append(f"بدهی قبلی: {_fmt_amount(int(debt))}")
+        payable = amounts.get("payable")
+        if payable:
+            lines.append(f"قابل پرداخت: {_fmt_amount(int(payable))}")
+    if term:
+        lines.append(f"دوره: {term}")
+    total = (details.get("consumption") or {}).get("total")
+    if total is not None:
+        lines.append(f"مصرف دوره: {_fmt_kwh(total)} کیلووات‌ساعت")
+    due = details.get("due_date")
+    if due:
+        lines.append(f"مهلت پرداخت: {due}")
+    return "\n".join(lines)
+
+
+def render_bill(obj) -> str:
+    return render_bill_summary(
+        utility_type=obj.utility_type, amount=int(obj.amount),
+        term=obj.term, details=getattr(obj, "details", None) or {})
 
 
 def render_summary(detail: BillDetail) -> str:
-    kind = {"electricity": "برق", "gas": "گاز", "water": "آب",
-            "tel": "تلفن", "mobile": "موبایل"}.get(detail.utility_type, "قبض")
-    lines = [f"📄 قبض {kind}", f"مبلغ: {_fmt_amount(detail.amount)}"]
-    if detail.term:
-        lines.append(f"دوره: {detail.term}")
-    if detail.due_date:
-        lines.append(f"مهلت پرداخت: {detail.due_date}")
-    return "\n".join(lines)
+    return render_bill(detail)
 
 
 class BillingService:
