@@ -44,3 +44,37 @@ def test_render_full():
 def test_render_omits_empty_sections():
     msg = render_suggestions({"intro": "", "tips": [], "targets": []})
     assert msg.strip() == "💡 پیشنهادها برای این قبض"
+
+
+from energybot.billing.suggestions import _build_targets_as_goals
+
+
+def test_build_targets_as_goals_maps_fields():
+    goals = _build_targets_as_goals(
+        [{"text": "کاهش اوج", "metric": "peak_kwh", "baseline": 120,
+          "target_value": 108, "target_date": "1405/04/31"}],
+        bill_id="bill-1",
+    )
+    assert len(goals) == 1
+    g = goals[0]
+    assert g["text"] == "کاهش اوج"
+    assert g["status"] == "active"
+    assert g["source"] == "bill_suggestion"
+    assert g["bill_id"] == "bill-1"
+    assert g["metric"] == "peak_kwh"
+    assert g["baseline"] == 120
+    assert g["target_value"] == 108
+    assert g["target_date"] == "1405/04/31"
+    assert isinstance(g["id"], str) and g["id"]
+
+
+def test_build_targets_defaults_optionals_to_none():
+    goals = _build_targets_as_goals([{"text": "فقط متن"}], bill_id="b")
+    g = goals[0]
+    assert g["metric"] is None and g["baseline"] is None
+    assert g["target_value"] is None and g["target_date"] is None
+
+
+def test_build_targets_unique_ids():
+    goals = _build_targets_as_goals([{"text": "a"}, {"text": "b"}], bill_id="b")
+    assert goals[0]["id"] != goals[1]["id"]

@@ -1,4 +1,5 @@
 import json
+from uuid import uuid4
 
 from energybot.logging import get_logger
 
@@ -47,3 +48,20 @@ def render_suggestions(payload: dict) -> str:
         lines.append("🎯 هدف‌ها")
         lines.extend(f"- {t.get('text', '')}" for t in targets)
     return "\n".join(lines)
+
+
+def _build_targets_as_goals(targets: list[dict], bill_id: str) -> list[dict]:
+    return [
+        {
+            "id": uuid4().hex,
+            "text": t.get("text", ""),
+            "status": "active",
+            "source": "bill_suggestion",
+            "bill_id": bill_id,
+            "metric": t.get("metric"),
+            "baseline": t.get("baseline"),
+            "target_value": t.get("target_value"),
+            "target_date": t.get("target_date"),
+        }
+        for t in targets
+    ]
