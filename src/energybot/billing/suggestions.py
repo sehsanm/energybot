@@ -94,7 +94,6 @@ def _build_prompt_variables(bill, profile, prev) -> dict:
         "normal_kwh": cons.get("normal"),
         "low_kwh": cons.get("low"),
         "household": profile.household or {},
-        "behaviour": profile.behaviour or {},
         "prev": prev_block,
     }
 
@@ -152,7 +151,9 @@ async def _generate(sf, *, user_id, chat_id, bill_db_id, router, prompt_loader, 
         "model": resp.model,
         "prompt_version": version,
     }
-    await billing_repo.set_bill_suggestions(bill.id, payload)
+    claimed = await billing_repo.set_bill_suggestions_if_absent(bill.id, payload)
+    if not claimed:
+        return  # another task already generated for this bill; it will send.
     for goal in _build_targets_as_goals(parsed["targets"], str(bill.id)):
         await profile_repo.append(user_id, "goals", goal,
                                   source="bill_suggestion", reason="هدف پیشنهادی از روی قبض")

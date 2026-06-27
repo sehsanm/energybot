@@ -64,6 +64,23 @@ async def test_set_bill_suggestions_persists(db_session):
     assert row.suggestions == {"intro": "x", "tips": [], "targets": []}
 
 
+async def test_set_bill_suggestions_if_absent_atomic(db_session):
+    _, _, bills = await _sub_with_bills(db_session, 1)
+    repo = BillingRepository(session_factory=lambda: db_session)
+    payloadA = {"intro": "first", "tips": [], "targets": []}
+    payloadB = {"intro": "second", "tips": [], "targets": []}
+
+    claimed = await repo.set_bill_suggestions_if_absent(bills[0].id, payloadA)
+    assert claimed is True
+    row = (await db_session.execute(select(Bill).where(Bill.id == bills[0].id))).scalar_one()
+    assert row.suggestions == payloadA
+
+    claimed2 = await repo.set_bill_suggestions_if_absent(bills[0].id, payloadB)
+    assert claimed2 is False
+    row2 = (await db_session.execute(select(Bill).where(Bill.id == bills[0].id))).scalar_one()
+    assert row2.suggestions == payloadA  # not overwritten
+
+
 async def test_prior_bills_excludes_current_newest_first(db_session):
     _, sub, bills = await _sub_with_bills(db_session, 3)
     repo = BillingRepository(session_factory=lambda: db_session)

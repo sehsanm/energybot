@@ -157,6 +157,24 @@ async def test_send_capture_spawns_suggestions(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_on_suggestions_task_done_logs_and_discards_on_exception():
+    import asyncio
+
+    async def _boom():
+        raise RuntimeError("x")
+
+    task = asyncio.ensure_future(_boom())
+    try:
+        await task
+    except RuntimeError:
+        pass
+
+    h._BACKGROUND_TASKS.add(task)
+    h._on_suggestions_task_done(task)  # should log, not raise
+    assert task not in h._BACKGROUND_TASKS
+
+
+@pytest.mark.asyncio
 async def test_send_capture_no_spawn_on_error(monkeypatch):
     calls = []
     monkeypatch.setattr(h, "_spawn_suggestions",

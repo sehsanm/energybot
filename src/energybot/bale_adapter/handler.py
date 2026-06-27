@@ -19,13 +19,20 @@ _bale_singleton: BaleClient | None = None
 _BACKGROUND_TASKS: set = set()
 
 
+def _on_suggestions_task_done(task: asyncio.Task) -> None:
+    _BACKGROUND_TASKS.discard(task)
+    if not task.cancelled() and task.exception() is not None:
+        from energybot.logging import get_logger
+        get_logger(__name__).warning("bill_suggestions_task_failed", error=str(task.exception()))
+
+
 def _spawn_suggestions(user_id, chat_id: int, bill_db_id: UUID) -> None:
     from energybot.billing.suggestions import generate_and_send_suggestions
     task = asyncio.create_task(
         generate_and_send_suggestions(user_id=user_id, chat_id=chat_id, bill_db_id=bill_db_id)
     )
     _BACKGROUND_TASKS.add(task)
-    task.add_done_callback(_BACKGROUND_TASKS.discard)
+    task.add_done_callback(_on_suggestions_task_done)
 
 
 def get_bale_client() -> BaleClient:
