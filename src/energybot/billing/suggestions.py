@@ -1,0 +1,32 @@
+import json
+
+from energybot.logging import get_logger
+
+log = get_logger(__name__)
+
+
+def _parse_suggestions_json(text: str | None) -> dict | None:
+    if not text:
+        return None
+    t = text.strip()
+    start, end = t.find("{"), t.rfind("}")
+    if start == -1 or end == -1 or end <= start:
+        return None
+    try:
+        data = json.loads(t[start:end + 1])
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    intro, tips, targets = data.get("intro"), data.get("tips"), data.get("targets")
+    if not isinstance(intro, str):
+        return None
+    if not isinstance(tips, list) or not all(isinstance(x, str) for x in tips):
+        return None
+    if not isinstance(targets, list):
+        return None
+    return {
+        "intro": intro.strip(),
+        "tips": [x.strip() for x in tips if x.strip()],
+        "targets": [t for t in targets if isinstance(t, dict) and isinstance(t.get("text"), str)],
+    }
