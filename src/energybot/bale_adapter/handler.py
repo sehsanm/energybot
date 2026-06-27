@@ -1,5 +1,7 @@
+import asyncio
 from collections.abc import Callable
 from typing import Any
+from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from energybot.bale_adapter.client import BaleClient
@@ -13,6 +15,24 @@ from energybot.settings import get_settings
 
 
 _bale_singleton: BaleClient | None = None
+
+_BACKGROUND_TASKS: set = set()
+
+
+def _on_suggestions_task_done(task: asyncio.Task) -> None:
+    _BACKGROUND_TASKS.discard(task)
+    if not task.cancelled() and task.exception() is not None:
+        from energybot.logging import get_logger
+        get_logger(__name__).warning("bill_suggestions_task_failed", error=str(task.exception()))
+
+
+def _spawn_suggestions(user_id, chat_id: int, bill_db_id: UUID) -> None:
+    from energybot.billing.suggestions import generate_and_send_suggestions
+    task = asyncio.create_task(
+        generate_and_send_suggestions(user_id=user_id, chat_id=chat_id, bill_db_id=bill_db_id)
+    )
+    _BACKGROUND_TASKS.add(task)
+    task.add_done_callback(_on_suggestions_task_done)
 
 
 def get_bale_client() -> BaleClient:
@@ -29,12 +49,14 @@ def build_agent_for_user(user_id, chat_id, session_factory):
     return build_agent(user_id=user_id, channel=BaleChannel(get_bale_client(), chat_id), session_factory=session_factory)
 
 
-async def _send_capture(bale, chat_id, res):
+async def _send_capture(bale, chat_id, res, user_id):
     if not res.ok:
         await bale.send_message(chat_id=chat_id, text=res.error)
         return
     markup = {"inline_keyboard": [[{"text": "پرداخت 💳", "callback_data": res.pay_callback}]]}
     await bale.send_message(chat_id=chat_id, text=res.summary, reply_markup=markup)
+    if res.bill_db_id:
+        _spawn_suggestions(user_id, chat_id, UUID(res.bill_db_id))
 
 
 async def _ensure_user_and_profile(session: AsyncSession, bale_user_id: int, display_name: str | None) -> User:
@@ -151,7 +173,7 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
             get_logger(__name__).exception("photo_billing_failed", chat_id=parsed.chat_id)
             await bale.send_message(chat_id=parsed.chat_id, text="نتونستم عکس رو پردازش کنم. دوباره امتحان کن.")
             return
-        await _send_capture(bale, parsed.chat_id, res)
+        await _send_capture(bale, parsed.chat_id, res, user.id)
         return
 
     elif isinstance(parsed, UpdateDocument):
@@ -164,7 +186,6 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
             await _dispatch_quick_action(bale, session, session_factory, user, parsed.chat_id, parsed.data[4:])
             return
         if parsed.data.startswith("pay:"):
-            from uuid import UUID
             svc = build_billing_service(session_factory)
             try:
                 url = await svc.start_payment(user.id, parsed.chat_id, UUID(parsed.data[4:]))
@@ -260,7 +281,7 @@ async def _handle_bill_document(bale, session_factory, user_id, parsed) -> None:
         get_logger(__name__).exception("document_billing_failed", chat_id=parsed.chat_id)
         await bale.send_message(chat_id=parsed.chat_id, text="نتونستم فایل را پردازش کنم. دوباره امتحان کن.")
         return
-    await _send_capture(bale, parsed.chat_id, res)
+    await _send_capture(bale, parsed.chat_id, res, user_id)
 
 
 def _looks_like_bill_id(text: str) -> bool:
@@ -283,7 +304,7 @@ async def _process_typed_bill(bale, session_factory, user_id, chat_id, arg) -> N
         get_logger(__name__).exception("bill_command_failed", chat_id=chat_id)
         await bale.send_message(chat_id=chat_id, text="متأسفم، در پردازش قبض مشکلی پیش اومد. بعداً دوباره امتحان کن.")
         return
-    await _send_capture(bale, chat_id, res)
+    await _send_capture(bale, chat_id, res, user_id)
 
 
 async def _reply_with_agent(bale, user, chat_id, text, session_factory) -> None:

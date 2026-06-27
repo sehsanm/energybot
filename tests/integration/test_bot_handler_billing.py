@@ -1,6 +1,8 @@
 import pytest
+from uuid import uuid4, UUID
 from sqlalchemy import select
 from energybot.bale_adapter.handler import handle_bale_update
+from energybot.bale_adapter import handler as h
 from energybot.core.models import User, Bill
 from energybot.billing.bill_numbers import _check_digit
 
@@ -43,6 +45,12 @@ def _fake_billing(monkeypatch, db_session):
                               repo=BillingRepository(session_factory=session_factory),
                               callback_base_url="https://bot.test", provider_name="fake")
     monkeypatch.setattr("energybot.bale_adapter.handler.build_billing_service", factory)
+
+
+@pytest.fixture(autouse=True)
+def _no_spawn_suggestions(monkeypatch):
+    """Prevent pre-existing capture tests from firing a real background suggestion task."""
+    monkeypatch.setattr(h, "_spawn_suggestions", lambda *args, **kwargs: None)
 
 
 @pytest.mark.asyncio
@@ -128,3 +136,55 @@ async def test_pay_callback_sends_pay_link(db_session, monkeypatch):
 
     # FakePaymentProvider returns redirect_url = f"https://pay.fake/{bill_id}" where bill_id is the utility bill number
     assert any("https://pay.fake/" in s["text"] for s in bale.sent)
+
+
+@pytest.mark.asyncio
+async def test_send_capture_spawns_suggestions(monkeypatch):
+    calls = []
+    monkeypatch.setattr(h, "_spawn_suggestions",
+                        lambda user_id, chat_id, bill_db_id: calls.append((user_id, chat_id, bill_db_id)))
+
+    class _Bale:
+        async def send_message(self, *, chat_id, text, reply_markup=None):
+            pass
+
+    from energybot.billing.service import CaptureResult
+    bid = uuid4()
+    uid = uuid4()
+    res = CaptureResult(ok=True, summary="خلاصه", pay_callback=f"pay:{bid}", bill_db_id=str(bid), error=None)
+    await h._send_capture(_Bale(), 777, res, uid)
+    assert calls == [(uid, 777, bid)]
+
+
+@pytest.mark.asyncio
+async def test_on_suggestions_task_done_logs_and_discards_on_exception():
+    import asyncio
+
+    async def _boom():
+        raise RuntimeError("x")
+
+    task = asyncio.ensure_future(_boom())
+    try:
+        await task
+    except RuntimeError:
+        pass
+
+    h._BACKGROUND_TASKS.add(task)
+    h._on_suggestions_task_done(task)  # should log, not raise
+    assert task not in h._BACKGROUND_TASKS
+
+
+@pytest.mark.asyncio
+async def test_send_capture_no_spawn_on_error(monkeypatch):
+    calls = []
+    monkeypatch.setattr(h, "_spawn_suggestions",
+                        lambda user_id, chat_id, bill_db_id: calls.append(1))
+
+    class _Bale:
+        async def send_message(self, *, chat_id, text, reply_markup=None):
+            pass
+
+    from energybot.billing.service import CaptureResult
+    res = CaptureResult(ok=False, summary="", pay_callback=None, bill_db_id=None, error="خطا")
+    await h._send_capture(_Bale(), 777, res, uuid4())
+    assert calls == []
