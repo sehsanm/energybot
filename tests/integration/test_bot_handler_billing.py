@@ -47,6 +47,12 @@ def _fake_billing(monkeypatch, db_session):
     monkeypatch.setattr("energybot.bale_adapter.handler.build_billing_service", factory)
 
 
+@pytest.fixture(autouse=True)
+def _no_spawn_suggestions(monkeypatch):
+    """Prevent pre-existing capture tests from firing a real background suggestion task."""
+    monkeypatch.setattr(h, "_spawn_suggestions", lambda *args, **kwargs: None)
+
+
 @pytest.mark.asyncio
 async def test_typed_bill_id_creates_snapshot_with_pay_button(db_session, monkeypatch):
     bale = FakeBale()
