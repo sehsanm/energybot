@@ -97,6 +97,23 @@ class BillingRepository:
             select(Bill).where(Bill.id == bill_id)
         )).scalar_one_or_none()
 
+    async def set_bill_suggestions(self, bill_id: UUID, payload: dict) -> None:
+        s = self._session_factory()
+        bill = (await s.execute(select(Bill).where(Bill.id == bill_id))).scalar_one()
+        bill.suggestions = payload
+        await s.commit()
+
+    async def prior_bills_for_subscription(
+        self, subscription_id: UUID, *, before_bill_id: UUID, limit: int = 3
+    ) -> list["Bill"]:
+        s = self._session_factory()
+        return list((await s.execute(
+            select(Bill)
+            .where(Bill.subscription_id == subscription_id, Bill.id != before_bill_id)
+            .order_by(Bill.inquired_at.desc(), Bill.id.desc())
+            .limit(limit)
+        )).scalars().all())
+
     async def find_bill_by_bill_id(self, user_id: UUID, bill_id: str) -> Bill | None:
         s = self._session_factory()
         return (await s.execute(
