@@ -78,3 +78,26 @@ def test_build_targets_defaults_optionals_to_none():
 def test_build_targets_unique_ids():
     goals = _build_targets_as_goals([{"text": "a"}, {"text": "b"}], bill_id="b")
     assert goals[0]["id"] != goals[1]["id"]
+
+
+import importlib.util
+from pathlib import Path
+
+_ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_prompt_seed_file_present():
+    p = _ROOT / "scripts" / "seed_data" / "prompts" / "bill_suggestions.md"
+    text = p.read_text(encoding="utf-8")
+    assert "key: bill_suggestions" in text
+    # Prompt must demand strict JSON with the three keys we parse.
+    assert "intro" in text and "tips" in text and "targets" in text
+
+
+def test_model_config_has_bill_suggestions():
+    spec = importlib.util.spec_from_file_location("seed_dev", _ROOT / "scripts" / "seed_dev.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    cfgs = {c["call_type"]: c for c in mod.DEFAULT_MODEL_CONFIGS}
+    assert "bill_suggestions" in cfgs
+    assert cfgs["bill_suggestions"]["params"].get("fallback")

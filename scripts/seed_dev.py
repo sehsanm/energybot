@@ -152,6 +152,13 @@ DEFAULT_MODEL_CONFIGS: list[dict] = [
         "params": {"dimensions": EMBED_DIM},
         "is_active": True,
     },
+    {
+        "call_type": "bill_suggestions",
+        "provider": "deepseek",
+        "model_name": "deepseek-v4-flash",
+        "params": {"temperature": 0.4, "fallback": {"provider": "metis", "model_name": "gpt-4o-mini"}},
+        "is_active": True,
+    },
 ]
 
 
