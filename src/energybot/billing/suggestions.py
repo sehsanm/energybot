@@ -30,3 +30,20 @@ def _parse_suggestions_json(text: str | None) -> dict | None:
         "tips": [x.strip() for x in tips if x.strip()],
         "targets": [t for t in targets if isinstance(t, dict) and isinstance(t.get("text"), str)],
     }
+
+
+def render_suggestions(payload: dict) -> str:
+    intro = (payload.get("intro") or "").strip()
+    tips = payload.get("tips") or []
+    targets = payload.get("targets") or []
+    lines = ["💡 پیشنهادها برای این قبض"]
+    if intro:
+        lines.append(intro)
+    if tips:
+        lines.append("")
+        lines.extend(f"• {t}" for t in tips)
+    if targets:
+        lines.append("")
+        lines.append("🎯 هدف‌ها")
+        lines.extend(f"- {t.get('text', '')}" for t in targets)
+    return "\n".join(lines)
