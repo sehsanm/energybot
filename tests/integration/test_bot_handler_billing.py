@@ -1,6 +1,8 @@
 import pytest
+from uuid import uuid4, UUID
 from sqlalchemy import select
 from energybot.bale_adapter.handler import handle_bale_update
+from energybot.bale_adapter import handler as h
 from energybot.core.models import User, Bill
 from energybot.billing.bill_numbers import _check_digit
 
@@ -128,3 +130,37 @@ async def test_pay_callback_sends_pay_link(db_session, monkeypatch):
 
     # FakePaymentProvider returns redirect_url = f"https://pay.fake/{bill_id}" where bill_id is the utility bill number
     assert any("https://pay.fake/" in s["text"] for s in bale.sent)
+
+
+@pytest.mark.asyncio
+async def test_send_capture_spawns_suggestions(monkeypatch):
+    calls = []
+    monkeypatch.setattr(h, "_spawn_suggestions",
+                        lambda user_id, chat_id, bill_db_id: calls.append((user_id, chat_id, bill_db_id)))
+
+    class _Bale:
+        async def send_message(self, *, chat_id, text, reply_markup=None):
+            pass
+
+    from energybot.billing.service import CaptureResult
+    bid = uuid4()
+    uid = uuid4()
+    res = CaptureResult(ok=True, summary="خلاصه", pay_callback=f"pay:{bid}", bill_db_id=str(bid), error=None)
+    await h._send_capture(_Bale(), 777, res, uid)
+    assert calls == [(uid, 777, bid)]
+
+
+@pytest.mark.asyncio
+async def test_send_capture_no_spawn_on_error(monkeypatch):
+    calls = []
+    monkeypatch.setattr(h, "_spawn_suggestions",
+                        lambda user_id, chat_id, bill_db_id: calls.append(1))
+
+    class _Bale:
+        async def send_message(self, *, chat_id, text, reply_markup=None):
+            pass
+
+    from energybot.billing.service import CaptureResult
+    res = CaptureResult(ok=False, summary="", pay_callback=None, bill_db_id=None, error="خطا")
+    await h._send_capture(_Bale(), 777, res, uuid4())
+    assert calls == []
