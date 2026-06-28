@@ -123,3 +123,56 @@ def test_season_for_jalali_date_bad_input():
     assert _season_for_jalali_date("1405") == (None, None)
     assert _season_for_jalali_date("1405/13/01") == (None, None)
     assert _season_for_jalali_date("1405/xx/01") == (None, None)
+
+
+from types import SimpleNamespace
+from energybot.billing.suggestions import _build_suggestion_context
+
+
+def _fake_bill(**details):
+    return SimpleNamespace(utility_type="electricity", amount=2_000_000, term="1405/3", details=details)
+
+
+def _fake_profile(household=None, behaviour=None):
+    return SimpleNamespace(household=household or {}, behaviour=behaviour or {})
+
+
+def test_context_derives_season_shares_density_costsplit():
+    bill = _fake_bill(
+        consumption={"total": 400, "peak": 200, "normal": 120, "low": 80},
+        amounts={"period": 2_000_000, "energy": 1_500_000, "tax": 180_000, "subscription": 90_000},
+        period={"days": 60}, reading={"current_date": "1405/05/20"},
+        tariff="خانگی", phase=1, amper=25, customer_type="مسکونی")
+    prof = _fake_profile(household={"occupants": 4, "area_m2": 100, "city": "تهران"},
+                         behaviour={"peak_usage_hours": "شب‌ها"})
+    ctx = _build_suggestion_context(bill, prof, None)
+    assert ctx["season"] == "تابستان" and ctx["jalali_month"] == 5
+    assert ctx["days"] == 60 and ctx["kwh_per_day"] == round(400 / 60, 1)
+    assert ctx["peak_pct"] == 50 and ctx["normal_pct"] == 30 and ctx["low_pct"] == 20
+    assert ctx["kwh_per_person"] == 100.0 and ctx["kwh_per_m2"] == 4.0
+    assert ctx["amount_toman"] == 200_000 and ctx["energy_toman"] == 150_000
+    assert ctx["tax_toman"] == 18_000 and ctx["subscription_toman"] == 9_000
+    assert ctx["tariff"] == "خانگی" and ctx["phase"] == 1
+    assert ctx["behaviour"]["peak_usage_hours"] == "شب‌ها"
+    assert ctx["household"]["city"] == "تهران"
+    assert ctx["prev"] is None and ctx["user_memory"] is None
+
+
+def test_context_handles_missing_details_without_error():
+    bill = _fake_bill()  # no consumption/amounts/reading/period
+    ctx = _build_suggestion_context(bill, _fake_profile(), None)
+    assert ctx["season"] is None and ctx["days"] is None
+    assert ctx["total_kwh"] is None and ctx["peak_pct"] is None
+    assert ctx["kwh_per_person"] is None and ctx["kwh_per_m2"] is None
+    assert ctx["amount_toman"] == 200_000  # falls back to bill.amount//10
+
+
+def test_context_prev_delta():
+    bill = _fake_bill(consumption={"total": 400}, amounts={"period": 2_000_000})
+    prev = _fake_bill(consumption={"total": 300}, amounts={"period": 1_000_000})
+    prev.term = "1405/2"
+    ctx = _build_suggestion_context(bill, _fake_profile(), prev)
+    assert ctx["prev"]["total_kwh"] == 300 and ctx["prev"]["amount_toman"] == 100_000
+    assert ctx["prev"]["delta_kwh"] == 100
+    assert ctx["prev"]["delta_pct"] == 33  # round(100*100/300)
+    assert ctx["prev"]["delta_toman"] == 100_000  # 200000 - 100000
