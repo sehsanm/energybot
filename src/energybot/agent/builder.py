@@ -17,6 +17,8 @@ from energybot.agent.tools.suggest_actions import SuggestActionsTool
 from energybot.agent.result import AgentResult
 from energybot.billing.repository import BillingRepository
 from energybot.chat.repository import ChatRepository
+from energybot.memory.repository import MemoryRepository
+from energybot.agent.tools.manage_memory import ManageMemoryTool
 from energybot.profile.repository import ProfileRepository
 from energybot.kb.retrieval import RetrievalService
 from energybot.providers.factory import build_providers
@@ -28,13 +30,15 @@ def build_agent(*, user_id: UUID, channel, session_factory: Callable[[], AsyncSe
     router = ProviderRouter(providers=build_providers(s), session_factory=session_factory)
     chat_repo = ChatRepository(session_factory=session_factory, idle_minutes=s.session_idle_minutes)
     profile_repo = ProfileRepository(session_factory=session_factory)
+    memory_repo = MemoryRepository(session_factory=session_factory)
     loader = PromptLoader(session_factory=session_factory)
-    asm = ContextAssembler(prompt_loader=loader, profile_repo=profile_repo, chat_repo=chat_repo)
+    asm = ContextAssembler(prompt_loader=loader, profile_repo=profile_repo, chat_repo=chat_repo, memory_repo=memory_repo)
     retrieval = RetrievalService(router=router, session_factory=session_factory)
     registry = ToolRegistry()
     registry.register(ReadProfileTool(repo=profile_repo, user_id=user_id))
     registry.register(UpdateProfileTool(repo=profile_repo, user_id=user_id, current_message_id=None))
     registry.register(RecordCommitmentTool(repo=profile_repo, user_id=user_id, current_message_id=None))
+    registry.register(ManageMemoryTool(repo=memory_repo, user_id=user_id, current_message_id=None))
     registry.register(SearchKBTool(retrieval=retrieval))
     registry.register(SendKBMediaTool(channel=channel, session_factory=session_factory))
     registry.register(ReadBillsTool(repo=BillingRepository(session_factory=session_factory), user_id=user_id))

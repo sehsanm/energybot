@@ -3,6 +3,7 @@ from uuid import uuid4
 from energybot.core.models import User, Profile
 from energybot.profile.repository import ProfileRepository
 from energybot.chat.repository import ChatRepository
+from energybot.memory.repository import MemoryRepository
 from energybot.agent.context import ContextAssembler
 from energybot.agent.tools.base import ToolRegistry
 from energybot.agent.loop import AgentLoop
@@ -38,7 +39,8 @@ async def test_simple_turn_no_tools(db_session):
     u = await _user(db_session)
     asm = ContextAssembler(prompt_loader=FakeLoader(),
                            profile_repo=ProfileRepository(session_factory=lambda: db_session),
-                           chat_repo=ChatRepository(session_factory=lambda: db_session))
+                           chat_repo=ChatRepository(session_factory=lambda: db_session),
+                           memory_repo=MemoryRepository(session_factory=lambda: db_session))
     router = FakeRouter([ChatResponse(content="درود", tokens_in=10, tokens_out=2, finish_reason="stop")])
     loop = AgentLoop(router=router, context_assembler=asm, chat_repo=ChatRepository(session_factory=lambda: db_session),
                      tool_registry=ToolRegistry(), summarizer=None, tool_iteration_cap=6, user_id=u.id)
@@ -51,7 +53,8 @@ async def test_tool_iteration_cap(db_session):
     u = await _user(db_session)
     asm = ContextAssembler(prompt_loader=FakeLoader(),
                            profile_repo=ProfileRepository(session_factory=lambda: db_session),
-                           chat_repo=ChatRepository(session_factory=lambda: db_session))
+                           chat_repo=ChatRepository(session_factory=lambda: db_session),
+                           memory_repo=MemoryRepository(session_factory=lambda: db_session))
     tool_resp = lambda i: ChatResponse(
         content="", tokens_in=1, tokens_out=1, finish_reason="tool_calls",
         tool_calls=[{"id": f"t{i}", "type": "function", "function": {"name": "read_profile", "arguments": "{}"}}],
