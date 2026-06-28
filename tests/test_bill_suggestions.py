@@ -215,3 +215,18 @@ def test_build_targets_savings_default_none():
     g = _build_targets_as_goals([{"text": "t"}], bill_id="b")[0]
     assert g["saving_kwh"] is None and g["saving_toman"] is None
     assert g["saving_pct"] is None and g["how"] is None
+
+
+def test_fmt_saving_ignores_nonnumeric_values():
+    from energybot.billing.suggestions import _fmt_saving
+    # all non-numeric → None, and must not raise
+    assert _fmt_saving({"saving_kwh": "۱۲", "saving_toman": "x", "saving_pct": None}) is None
+    # numeric toman kept, non-numeric kwh skipped
+    out = _fmt_saving({"saving_kwh": "bad", "saving_toman": 36000, "saving_pct": "10"})
+    assert out is not None and "تومان" in out and "کیلووات‌ساعت" not in out
+
+
+def test_render_target_with_stringy_savings_does_not_crash():
+    msg = render_suggestions({"intro": "", "tips": [],
+                              "targets": [{"text": "t", "saving_kwh": "۱۲", "how": "x"}]})
+    assert "- t" in msg and "صرفه‌جویی" not in msg and "چطور: x" in msg
