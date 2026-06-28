@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Home, Target, Handshake, Sparkles, Plus, X, AlertCircle } from "lucide-react";
+import { Home, Target, Handshake, Sparkles, Plus, X, AlertCircle, Brain } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,9 @@ import {
   patchProfile,
   addProfileItem,
   removeProfileItem,
+  getMemory,
   type ProfileData,
+  type MemoryGroup,
 } from "@/lib/api";
 
 // occupants is stored normalized to an int (e.g. "5+" -> 5); map back to the option label.
@@ -33,9 +35,11 @@ export default function ProfilePage() {
   const [err, setErr] = useState<string | null>(null);
   const [goalText, setGoalText] = useState("");
   const [commitText, setCommitText] = useState("");
+  const [memory, setMemory] = useState<MemoryGroup[]>([]);
 
   useEffect(() => {
     getProfile().then(setP).catch(() => {});
+    getMemory().then(setMemory).catch(() => {});
   }, []);
 
   if (!p) {
@@ -182,6 +186,33 @@ export default function ProfilePage() {
                   </div>
                 ))}
               </dl>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* what the assistant remembers */}
+        {memory.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Brain className="h-4 w-4 text-muted-foreground" />
+                آنچه دستیار درباره‌ی شما به خاطر دارد
+              </CardTitle>
+              <CardDescription>به‌صورت خودکار از گفتگوها یاد گرفته شده</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {memory.map((g) => (
+                <div key={g.key} className="space-y-2">
+                  <p className="text-sm font-medium text-muted-foreground">{g.label}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {g.items.map((it) => (
+                      <span key={it.id} className="inline-flex rounded-full bg-muted px-3 py-1 text-sm">
+                        {it.text}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </CardContent>
           </Card>
         )}
