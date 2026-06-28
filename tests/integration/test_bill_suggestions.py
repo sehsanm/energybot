@@ -142,7 +142,9 @@ async def _user_profile_bill(db_session):
 
 _GOOD = _json.dumps({
     "intro": "مصرفت بالاست", "tips": ["کولر را کم کن"],
-    "targets": [{"text": "۱۰٪ کمتر در اوج", "metric": "peak_kwh", "baseline": 120, "target_value": 108}],
+    "targets": [{"text": "۱۰٪ کمتر در اوج", "metric": "peak_kwh", "baseline": 120,
+                 "target_value": 108, "saving_kwh": 12, "saving_toman": 36000,
+                 "saving_pct": 10, "how": "انتقال بار اوج به کم‌باری"}],
 }, ensure_ascii=False)
 
 
@@ -161,6 +163,12 @@ async def test_generate_persists_appends_goal_and_sends(db_session):
     assert bale.sent and "۱۰٪ کمتر در اوج" in bale.sent[0]
     # Prompt received the household context.
     assert loader.vars["household"]["city"] == "تهران"
+    # enriched target fields persist to the bill and the goal, and render in the message
+    assert row.suggestions["targets"][0]["saving_kwh"] == 12
+    goal = next(g for g in prof.goals if g["source"] == "bill_suggestion")
+    assert goal["saving_kwh"] == 12 and goal["how"] == "انتقال بار اوج به کم‌باری"
+    assert "صرفه‌جویی حدود" in bale.sent[0]
+    assert "چطور: انتقال بار اوج به کم‌باری" in bale.sent[0]
 
 
 async def test_generate_is_idempotent_on_reupload(db_session):
