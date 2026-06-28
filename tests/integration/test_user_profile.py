@@ -81,6 +81,31 @@ async def test_goals_add_and_remove(app, db_session):
 
 
 @pytest.mark.asyncio
+async def test_object_goals_and_commitments_serialized_as_text(app, db_session):
+    # Goals/commitments can be objects (bot agent + bill-suggestion targets) or
+    # legacy strings (web-added). The web API contract is string[], so the
+    # endpoint must flatten every item to its display text and never leak an
+    # object (which crashes the React profile page).
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+        u, _ = await _login(c, db_session, 706706)
+        p = (await db_session.execute(select(Profile).where(Profile.user_id == u.id))).scalar_one()
+        p.goals = [
+            {"id": "g1", "text": "کاهش ۱۰٪ مصرف اوج", "status": "active",
+             "source": "bill_suggestion", "metric": "peak_kwh", "baseline": 120,
+             "target_value": 108, "target_date": "1405/04/31"},
+            "هدف رشته‌ای قدیمی",
+        ]
+        p.commitments = [{"id": "c1", "text": "خاموش‌کردن لامپ‌ها", "target_date": None, "status": "open"}]
+        await db_session.commit()
+        r = await c.get("/api/app/profile")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["goals"] == ["کاهش ۱۰٪ مصرف اوج", "هدف رشته‌ای قدیمی"]
+    assert body["commitments"] == ["خاموش‌کردن لامپ‌ها"]
+    assert all(isinstance(x, str) for x in body["goals"] + body["commitments"])
+
+
+@pytest.mark.asyncio
 async def test_bad_section_404(app, db_session):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
         u, csrf = await _login(c, db_session, 705705)

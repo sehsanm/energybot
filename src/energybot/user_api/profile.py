@@ -18,10 +18,21 @@ class ItemIn(BaseModel):
     text: str
 
 
+def _as_text_list(items) -> list[str]:
+    # Goals/commitments may be plain strings (web-added) or objects (bot agent
+    # commitments, bill-suggestion targets: {text, status, ...}). The web UI
+    # contract is string[], so flatten each item to its display text. Map every
+    # item 1:1 (never drop) so remove-by-index stays aligned with the stored list.
+    out: list[str] = []
+    for it in items or []:
+        out.append(str(it.get("text", "")) if isinstance(it, dict) else str(it))
+    return out
+
+
 def _profile_dict(p) -> dict:
     return {
         "household": p.household, "behaviour": p.behaviour,
-        "goals": p.goals, "commitments": p.commitments,
+        "goals": _as_text_list(p.goals), "commitments": _as_text_list(p.commitments),
         "completeness_score": p.completeness_score,
         "fields": household_field_schema(),
     }
