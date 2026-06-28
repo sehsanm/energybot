@@ -90,14 +90,143 @@ def test_prompt_seed_file_present():
     p = _ROOT / "scripts" / "seed_data" / "prompts" / "bill_suggestions.md"
     text = p.read_text(encoding="utf-8")
     assert "key: bill_suggestions" in text
-    # Prompt must demand strict JSON with the three keys we parse.
     assert "intro" in text and "tips" in text and "targets" in text
+    # new enriched context + target fields the rewrite must reference
+    for token in ("season", "peak_pct", "kwh_per_person", "saving_kwh",
+                  "saving_toman", "saving_pct", "how", "behaviour"):
+        assert token in text, f"prompt missing {token!r}"
 
 
-def test_model_config_has_bill_suggestions():
+def test_model_config_bill_suggestions_uses_reasoner():
     spec = importlib.util.spec_from_file_location("seed_dev", _ROOT / "scripts" / "seed_dev.py")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     cfgs = {c["call_type"]: c for c in mod.DEFAULT_MODEL_CONFIGS}
-    assert "bill_suggestions" in cfgs
-    assert cfgs["bill_suggestions"]["params"].get("fallback")
+    cfg = cfgs["bill_suggestions"]
+    assert cfg["provider"] == "deepseek"
+    assert cfg["model_name"] == "deepseek-reasoner"
+    assert cfg["params"]["fallback"]["provider"] == "metis"
+
+
+from energybot.billing.suggestions import _season_for_jalali_date
+
+
+def test_season_for_jalali_date_quarters():
+    assert _season_for_jalali_date("1405/02/15") == ("بهار", 2)
+    assert _season_for_jalali_date("1405/05/01") == ("تابستان", 5)
+    assert _season_for_jalali_date("1405/08/30") == ("پاییز", 8)
+    assert _season_for_jalali_date("1405/11/10") == ("زمستان", 11)
+
+
+def test_season_for_jalali_date_persian_digits():
+    assert _season_for_jalali_date("۱۴۰۵/۰۴/۲۰") == ("تابستان", 4)
+
+
+def test_season_for_jalali_date_bad_input():
+    assert _season_for_jalali_date(None) == (None, None)
+    assert _season_for_jalali_date("") == (None, None)
+    assert _season_for_jalali_date("1405") == (None, None)
+    assert _season_for_jalali_date("1405/13/01") == (None, None)
+    assert _season_for_jalali_date("1405/xx/01") == (None, None)
+
+
+from types import SimpleNamespace
+from energybot.billing.suggestions import _build_suggestion_context
+
+
+def _fake_bill(**details):
+    return SimpleNamespace(utility_type="electricity", amount=2_000_000, term="1405/3", details=details)
+
+
+def _fake_profile(household=None, behaviour=None):
+    return SimpleNamespace(household=household or {}, behaviour=behaviour or {})
+
+
+def test_context_derives_season_shares_density_costsplit():
+    bill = _fake_bill(
+        consumption={"total": 400, "peak": 200, "normal": 120, "low": 80},
+        amounts={"period": 2_000_000, "energy": 1_500_000, "tax": 180_000, "subscription": 90_000},
+        period={"days": 60}, reading={"current_date": "1405/05/20"},
+        tariff="خانگی", phase=1, amper=25, customer_type="مسکونی")
+    prof = _fake_profile(household={"occupants": 4, "area_m2": 100, "city": "تهران"},
+                         behaviour={"peak_usage_hours": "شب‌ها"})
+    ctx = _build_suggestion_context(bill, prof, None)
+    assert ctx["season"] == "تابستان" and ctx["jalali_month"] == 5
+    assert ctx["days"] == 60 and ctx["kwh_per_day"] == round(400 / 60, 1)
+    assert ctx["peak_pct"] == 50 and ctx["normal_pct"] == 30 and ctx["low_pct"] == 20
+    assert ctx["kwh_per_person"] == 100.0 and ctx["kwh_per_m2"] == 4.0
+    assert ctx["amount_toman"] == 200_000 and ctx["energy_toman"] == 150_000
+    assert ctx["tax_toman"] == 18_000 and ctx["subscription_toman"] == 9_000
+    assert ctx["tariff"] == "خانگی" and ctx["phase"] == 1
+    assert ctx["behaviour"]["peak_usage_hours"] == "شب‌ها"
+    assert ctx["household"]["city"] == "تهران"
+    assert ctx["prev"] is None and ctx["user_memory"] is None
+
+
+def test_context_handles_missing_details_without_error():
+    bill = _fake_bill()  # no consumption/amounts/reading/period
+    ctx = _build_suggestion_context(bill, _fake_profile(), None)
+    assert ctx["season"] is None and ctx["days"] is None
+    assert ctx["total_kwh"] is None and ctx["peak_pct"] is None
+    assert ctx["kwh_per_person"] is None and ctx["kwh_per_m2"] is None
+    assert ctx["amount_toman"] == 200_000  # falls back to bill.amount//10
+
+
+def test_context_prev_delta():
+    bill = _fake_bill(consumption={"total": 400}, amounts={"period": 2_000_000})
+    prev = _fake_bill(consumption={"total": 300}, amounts={"period": 1_000_000})
+    prev.term = "1405/2"
+    ctx = _build_suggestion_context(bill, _fake_profile(), prev)
+    assert ctx["prev"]["total_kwh"] == 300 and ctx["prev"]["amount_toman"] == 100_000
+    assert ctx["prev"]["delta_kwh"] == 100
+    assert ctx["prev"]["delta_pct"] == 33  # round(100*100/300)
+    assert ctx["prev"]["delta_toman"] == 100_000  # 200000 - 100000
+
+
+def test_render_target_with_savings_and_how():
+    msg = render_suggestions({
+        "intro": "", "tips": [],
+        "targets": [{"text": "۱۰٪ کمتر در اوج", "saving_kwh": 12, "saving_toman": 36000,
+                     "saving_pct": 10, "how": "انتقال بار اوج به کم‌باری"}],
+    })
+    assert "- ۱۰٪ کمتر در اوج" in msg
+    assert "صرفه‌جویی حدود" in msg
+    assert "کیلووات‌ساعت" in msg and "تومان" in msg
+    assert "چطور: انتقال بار اوج به کم‌باری" in msg
+
+
+def test_render_target_without_savings_omits_lines():
+    msg = render_suggestions({"intro": "", "tips": [], "targets": [{"text": "هدف ساده"}]})
+    assert "- هدف ساده" in msg
+    assert "صرفه‌جویی" not in msg
+    assert "چطور:" not in msg
+
+
+def test_build_targets_carries_savings_and_how():
+    goals = _build_targets_as_goals(
+        [{"text": "t", "saving_kwh": 12, "saving_toman": 36000, "saving_pct": 10, "how": "روش"}],
+        bill_id="b")
+    g = goals[0]
+    assert g["saving_kwh"] == 12 and g["saving_toman"] == 36000
+    assert g["saving_pct"] == 10 and g["how"] == "روش"
+
+
+def test_build_targets_savings_default_none():
+    g = _build_targets_as_goals([{"text": "t"}], bill_id="b")[0]
+    assert g["saving_kwh"] is None and g["saving_toman"] is None
+    assert g["saving_pct"] is None and g["how"] is None
+
+
+def test_fmt_saving_ignores_nonnumeric_values():
+    from energybot.billing.suggestions import _fmt_saving
+    # all non-numeric → None, and must not raise
+    assert _fmt_saving({"saving_kwh": "۱۲", "saving_toman": "x", "saving_pct": None}) is None
+    # numeric toman kept, non-numeric kwh skipped
+    out = _fmt_saving({"saving_kwh": "bad", "saving_toman": 36000, "saving_pct": "10"})
+    assert out is not None and "تومان" in out and "کیلووات‌ساعت" not in out
+
+
+def test_render_target_with_stringy_savings_does_not_crash():
+    msg = render_suggestions({"intro": "", "tips": [],
+                              "targets": [{"text": "t", "saving_kwh": "۱۲", "how": "x"}]})
+    assert "- t" in msg and "صرفه‌جویی" not in msg and "چطور: x" in msg

@@ -8,6 +8,31 @@ from energybot.logging import get_logger
 log = get_logger(__name__)
 
 
+_JALALI_SEASONS = {
+    1: "بهار", 2: "بهار", 3: "بهار",
+    4: "تابستان", 5: "تابستان", 6: "تابستان",
+    7: "پاییز", 8: "پاییز", 9: "پاییز",
+    10: "زمستان", 11: "زمستان", 12: "زمستان",
+}
+
+_FA_DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
+
+
+def _season_for_jalali_date(s: str | None) -> tuple[str | None, int | None]:
+    if not s or not isinstance(s, str):
+        return None, None
+    parts = s.translate(_FA_DIGITS).split("/")
+    if len(parts) < 2:
+        return None, None
+    try:
+        month = int(parts[1])
+    except ValueError:
+        return None, None
+    if month < 1 or month > 12:
+        return None, None
+    return _JALALI_SEASONS[month], month
+
+
 def _parse_suggestions_json(text: str | None) -> dict | None:
     if not text:
         return None
@@ -35,6 +60,19 @@ def _parse_suggestions_json(text: str | None) -> dict | None:
     }
 
 
+def _fmt_saving(t: dict) -> str | None:
+    from energybot.billing.service import _to_persian_digits
+    kwh, toman, pct = t.get("saving_kwh"), t.get("saving_toman"), t.get("saving_pct")
+    bits = []
+    if isinstance(kwh, (int, float)):
+        bits.append(f"{_to_persian_digits(format(kwh, ','))} کیلووات‌ساعت")
+    if isinstance(toman, (int, float)):
+        bits.append(f"{_to_persian_digits(format(int(toman), ','))} تومان")
+    if isinstance(pct, (int, float)):
+        bits.append(f"{_to_persian_digits(str(pct))}٪")
+    return ("صرفه‌جویی حدود " + " / ".join(bits)) if bits else None
+
+
 def render_suggestions(payload: dict) -> str:
     intro = (payload.get("intro") or "").strip()
     tips = payload.get("tips") or []
@@ -48,7 +86,14 @@ def render_suggestions(payload: dict) -> str:
     if targets:
         lines.append("")
         lines.append("🎯 هدف‌ها")
-        lines.extend(f"- {t.get('text', '')}" for t in targets)
+        for t in targets:
+            lines.append(f"- {t.get('text', '')}")
+            saving = _fmt_saving(t)
+            if saving:
+                lines.append(f"  {saving}")
+            how = (t.get("how") or "").strip()
+            if how:
+                lines.append(f"  چطور: {how}")
     return "\n".join(lines)
 
 
@@ -63,38 +108,78 @@ def _build_targets_as_goals(targets: list[dict], bill_id: str) -> list[dict]:
             "metric": t.get("metric"),
             "baseline": t.get("baseline"),
             "target_value": t.get("target_value"),
+            "saving_kwh": t.get("saving_kwh"),
+            "saving_toman": t.get("saving_toman"),
+            "saving_pct": t.get("saving_pct"),
+            "how": t.get("how"),
             "target_date": t.get("target_date"),
         }
         for t in targets
     ]
 
 
-def _build_prompt_variables(bill, profile, prev) -> dict:
+def _pct(part, total):
+    if part is None or not total:
+        return None
+    return round(100 * part / total)
+
+
+def _ratio(total, divisor, ndigits=1):
+    if total is None or not divisor:
+        return None
+    return round(total / divisor, ndigits)
+
+
+def _build_suggestion_context(bill, profile, prev) -> dict:
     details = bill.details or {}
     cons = details.get("consumption") or {}
     amounts = details.get("amounts") or {}
+    reading = details.get("reading") or {}
+    period = details.get("period") or {}
+    household = profile.household or {}
 
     def toman(rial):
         return int(rial) // 10 if rial is not None else None
 
+    total = cons.get("total")
+    peak, normal, low, friday = cons.get("peak"), cons.get("normal"), cons.get("low"), cons.get("friday")
+    days = period.get("days")
+    season, jmonth = _season_for_jalali_date(reading.get("current_date"))
+    amount_toman = toman(amounts.get("period") or bill.amount)
+
     prev_block = None
     if prev is not None:
         pdet = prev.details or {}
+        ptotal = (pdet.get("consumption") or {}).get("total")
+        pamount = toman((pdet.get("amounts") or {}).get("period") or prev.amount)
         prev_block = {
-            "amount_toman": toman((pdet.get("amounts") or {}).get("period") or prev.amount),
-            "total_kwh": (pdet.get("consumption") or {}).get("total"),
-            "term": prev.term,
+            "amount_toman": pamount, "total_kwh": ptotal, "term": prev.term,
+            "delta_kwh": round(total - ptotal, 1) if (total is not None and ptotal is not None) else None,
+            "delta_pct": _pct(total - ptotal, ptotal) if (total is not None and ptotal) else None,
+            "delta_toman": (amount_toman - pamount) if (amount_toman is not None and pamount is not None) else None,
         }
+
     return {
         "utility_kind": {"electricity": "برق", "gas": "گاز", "water": "آب"}.get(bill.utility_type, "قبض"),
-        "amount_toman": toman(amounts.get("period") or bill.amount),
+        "amount_toman": amount_toman,
+        "energy_toman": toman(amounts.get("energy")),
+        "tax_toman": toman(amounts.get("tax")),
+        "subscription_toman": toman(amounts.get("subscription")),
         "term": bill.term,
-        "total_kwh": cons.get("total"),
-        "peak_kwh": cons.get("peak"),
-        "normal_kwh": cons.get("normal"),
-        "low_kwh": cons.get("low"),
-        "household": profile.household or {},
+        "season": season, "jalali_month": jmonth, "days": days,
+        "kwh_per_day": _ratio(total, days),
+        "total_kwh": total, "peak_kwh": peak, "normal_kwh": normal,
+        "low_kwh": low, "friday_kwh": friday,
+        "peak_pct": _pct(peak, total), "normal_pct": _pct(normal, total),
+        "low_pct": _pct(low, total), "friday_pct": _pct(friday, total),
+        "kwh_per_person": _ratio(total, household.get("occupants")),
+        "kwh_per_m2": _ratio(total, household.get("area_m2")),
+        "tariff": details.get("tariff"), "phase": details.get("phase"),
+        "amper": details.get("amper"), "customer_type": details.get("customer_type"),
+        "household": household,
+        "behaviour": profile.behaviour or {},
         "prev": prev_block,
+        "user_memory": None,
     }
 
 
@@ -130,7 +215,7 @@ async def _generate(sf, *, user_id, chat_id, bill_db_id, router, prompt_loader, 
 
     try:
         body, key, version = await prompt_loader.render(
-            "bill_suggestions", _build_prompt_variables(bill, profile, prev))
+            "bill_suggestions", _build_suggestion_context(bill, profile, prev))
         req = ChatRequest(model="", messages=[ChatMessage(role="user", content=body)])
         resp = await router.chat(call_type="bill_suggestions", req=req,
                                  prompt_key=key, prompt_version=version)
