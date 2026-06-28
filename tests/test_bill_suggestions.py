@@ -101,3 +101,25 @@ def test_model_config_has_bill_suggestions():
     cfgs = {c["call_type"]: c for c in mod.DEFAULT_MODEL_CONFIGS}
     assert "bill_suggestions" in cfgs
     assert cfgs["bill_suggestions"]["params"].get("fallback")
+
+
+from energybot.billing.suggestions import _season_for_jalali_date
+
+
+def test_season_for_jalali_date_quarters():
+    assert _season_for_jalali_date("1405/02/15") == ("بهار", 2)
+    assert _season_for_jalali_date("1405/05/01") == ("تابستان", 5)
+    assert _season_for_jalali_date("1405/08/30") == ("پاییز", 8)
+    assert _season_for_jalali_date("1405/11/10") == ("زمستان", 11)
+
+
+def test_season_for_jalali_date_persian_digits():
+    assert _season_for_jalali_date("۱۴۰۵/۰۴/۲۰") == ("تابستان", 4)
+
+
+def test_season_for_jalali_date_bad_input():
+    assert _season_for_jalali_date(None) == (None, None)
+    assert _season_for_jalali_date("") == (None, None)
+    assert _season_for_jalali_date("1405") == (None, None)
+    assert _season_for_jalali_date("1405/13/01") == (None, None)
+    assert _season_for_jalali_date("1405/xx/01") == (None, None)

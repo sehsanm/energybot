@@ -8,6 +8,31 @@ from energybot.logging import get_logger
 log = get_logger(__name__)
 
 
+_JALALI_SEASONS = {
+    1: "بهار", 2: "بهار", 3: "بهار",
+    4: "تابستان", 5: "تابستان", 6: "تابستان",
+    7: "پاییز", 8: "پاییز", 9: "پاییز",
+    10: "زمستان", 11: "زمستان", 12: "زمستان",
+}
+
+_FA_DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
+
+
+def _season_for_jalali_date(s: str | None) -> tuple[str | None, int | None]:
+    if not s or not isinstance(s, str):
+        return None, None
+    parts = s.translate(_FA_DIGITS).split("/")
+    if len(parts) < 2:
+        return None, None
+    try:
+        month = int(parts[1])
+    except ValueError:
+        return None, None
+    if month < 1 or month > 12:
+        return None, None
+    return _JALALI_SEASONS[month], month
+
+
 def _parse_suggestions_json(text: str | None) -> dict | None:
     if not text:
         return None
