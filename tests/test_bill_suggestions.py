@@ -176,3 +176,22 @@ def test_context_prev_delta():
     assert ctx["prev"]["delta_kwh"] == 100
     assert ctx["prev"]["delta_pct"] == 33  # round(100*100/300)
     assert ctx["prev"]["delta_toman"] == 100_000  # 200000 - 100000
+
+
+def test_render_target_with_savings_and_how():
+    msg = render_suggestions({
+        "intro": "", "tips": [],
+        "targets": [{"text": "۱۰٪ کمتر در اوج", "saving_kwh": 12, "saving_toman": 36000,
+                     "saving_pct": 10, "how": "انتقال بار اوج به کم‌باری"}],
+    })
+    assert "- ۱۰٪ کمتر در اوج" in msg
+    assert "صرفه‌جویی حدود" in msg
+    assert "کیلووات‌ساعت" in msg and "تومان" in msg
+    assert "چطور: انتقال بار اوج به کم‌باری" in msg
+
+
+def test_render_target_without_savings_omits_lines():
+    msg = render_suggestions({"intro": "", "tips": [], "targets": [{"text": "هدف ساده"}]})
+    assert "- هدف ساده" in msg
+    assert "صرفه‌جویی" not in msg
+    assert "چطور:" not in msg

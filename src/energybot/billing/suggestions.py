@@ -60,6 +60,21 @@ def _parse_suggestions_json(text: str | None) -> dict | None:
     }
 
 
+def _fmt_saving(t: dict) -> str | None:
+    from energybot.billing.service import _to_persian_digits
+    kwh, toman, pct = t.get("saving_kwh"), t.get("saving_toman"), t.get("saving_pct")
+    if kwh is None and toman is None and pct is None:
+        return None
+    bits = []
+    if kwh is not None:
+        bits.append(f"{_to_persian_digits(format(kwh, ','))} کیلووات‌ساعت")
+    if toman is not None:
+        bits.append(f"{_to_persian_digits(format(int(toman), ','))} تومان")
+    if pct is not None:
+        bits.append(f"{_to_persian_digits(str(pct))}٪")
+    return "صرفه‌جویی حدود " + " / ".join(bits)
+
+
 def render_suggestions(payload: dict) -> str:
     intro = (payload.get("intro") or "").strip()
     tips = payload.get("tips") or []
@@ -73,7 +88,14 @@ def render_suggestions(payload: dict) -> str:
     if targets:
         lines.append("")
         lines.append("🎯 هدف‌ها")
-        lines.extend(f"- {t.get('text', '')}" for t in targets)
+        for t in targets:
+            lines.append(f"- {t.get('text', '')}")
+            saving = _fmt_saving(t)
+            if saving:
+                lines.append(f"  {saving}")
+            how = (t.get("how") or "").strip()
+            if how:
+                lines.append(f"  چطور: {how}")
     return "\n".join(lines)
 
 
