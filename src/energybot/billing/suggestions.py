@@ -110,6 +110,10 @@ def _build_targets_as_goals(targets: list[dict], bill_id: str) -> list[dict]:
             "metric": t.get("metric"),
             "baseline": t.get("baseline"),
             "target_value": t.get("target_value"),
+            "saving_kwh": t.get("saving_kwh"),
+            "saving_toman": t.get("saving_toman"),
+            "saving_pct": t.get("saving_pct"),
+            "how": t.get("how"),
             "target_date": t.get("target_date"),
         }
         for t in targets

@@ -195,3 +195,18 @@ def test_render_target_without_savings_omits_lines():
     assert "- هدف ساده" in msg
     assert "صرفه‌جویی" not in msg
     assert "چطور:" not in msg
+
+
+def test_build_targets_carries_savings_and_how():
+    goals = _build_targets_as_goals(
+        [{"text": "t", "saving_kwh": 12, "saving_toman": 36000, "saving_pct": 10, "how": "روش"}],
+        bill_id="b")
+    g = goals[0]
+    assert g["saving_kwh"] == 12 and g["saving_toman"] == 36000
+    assert g["saving_pct"] == 10 and g["how"] == "روش"
+
+
+def test_build_targets_savings_default_none():
+    g = _build_targets_as_goals([{"text": "t"}], bill_id="b")[0]
+    assert g["saving_kwh"] is None and g["saving_toman"] is None
+    assert g["saving_pct"] is None and g["how"] is None
