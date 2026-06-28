@@ -155,7 +155,7 @@ DEFAULT_MODEL_CONFIGS: list[dict] = [
     {
         "call_type": "bill_suggestions",
         "provider": "deepseek",
-        "model_name": "deepseek-v4-flash",
+        "model_name": "deepseek-reasoner",
         "params": {"temperature": 0.4, "fallback": {"provider": "metis", "model_name": "gpt-4o-mini"}},
         "is_active": True,
     },

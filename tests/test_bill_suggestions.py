@@ -90,17 +90,22 @@ def test_prompt_seed_file_present():
     p = _ROOT / "scripts" / "seed_data" / "prompts" / "bill_suggestions.md"
     text = p.read_text(encoding="utf-8")
     assert "key: bill_suggestions" in text
-    # Prompt must demand strict JSON with the three keys we parse.
     assert "intro" in text and "tips" in text and "targets" in text
+    # new enriched context + target fields the rewrite must reference
+    for token in ("season", "peak_pct", "kwh_per_person", "saving_kwh",
+                  "saving_toman", "saving_pct", "how", "behaviour"):
+        assert token in text, f"prompt missing {token!r}"
 
 
-def test_model_config_has_bill_suggestions():
+def test_model_config_bill_suggestions_uses_reasoner():
     spec = importlib.util.spec_from_file_location("seed_dev", _ROOT / "scripts" / "seed_dev.py")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     cfgs = {c["call_type"]: c for c in mod.DEFAULT_MODEL_CONFIGS}
-    assert "bill_suggestions" in cfgs
-    assert cfgs["bill_suggestions"]["params"].get("fallback")
+    cfg = cfgs["bill_suggestions"]
+    assert cfg["provider"] == "deepseek"
+    assert cfg["model_name"] == "deepseek-reasoner"
+    assert cfg["params"]["fallback"]["provider"] == "metis"
 
 
 from energybot.billing.suggestions import _season_for_jalali_date
