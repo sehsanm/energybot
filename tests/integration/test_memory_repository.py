@@ -27,10 +27,11 @@ async def test_add_and_list_active(db_session):
 async def test_update_changes_text_and_category(db_session):
     u = await _user(db_session)
     repo = MemoryRepository(session_factory=lambda: db_session)
-    m = await repo.add(u.id, "اتاق خنک", "preference")
+    m = await repo.add(u.id, "اتاق خنک", "constraint")
     await repo.update(u.id, m.id, text="اتاق خیلی خنک را دوست دارد", category="preference")
     items = await repo.list_active(u.id)
     assert items[0].text == "اتاق خیلی خنک را دوست دارد"
+    assert items[0].category == "preference"
 
 
 @pytest.mark.asyncio
@@ -63,3 +64,11 @@ async def test_update_missing_id_raises(db_session):
     repo = MemoryRepository(session_factory=lambda: db_session)
     with pytest.raises(LookupError):
         await repo.update(u.id, 999999, text="x")
+
+
+@pytest.mark.asyncio
+async def test_add_invalid_category_raises(db_session):
+    u = await _user(db_session)
+    repo = MemoryRepository(session_factory=lambda: db_session)
+    with pytest.raises(ValueError):
+        await repo.add(u.id, "x", "not_a_category")
