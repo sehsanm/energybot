@@ -104,6 +104,19 @@ class ChatSummary(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
 
 
+class UserMemory(Base):
+    __tablename__ = "user_memories"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    category: Mapped[str] = mapped_column(String(30), nullable=False)
+    source_message_id: Mapped[int | None] = mapped_column(BigInteger)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
+    deleted_at: Mapped[datetime | None] = mapped_column()
+    __table_args__ = (Index("ix_user_memories_user", "user_id", "deleted_at"),)
+
+
 from pgvector.sqlalchemy import Vector
 
 

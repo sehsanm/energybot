@@ -151,3 +151,12 @@ export async function getDashboard(): Promise<DashboardData> {
   if (!r.ok) throw new Error(String(r.status));
   return r.json();
 }
+
+export type MemoryItem = { id: number; text: string };
+export type MemoryGroup = { key: string; label: string; items: MemoryItem[] };
+
+export async function getMemory(): Promise<MemoryGroup[]> {
+  const r = await req("/memory");
+  if (!r.ok) throw new Error(String(r.status));
+  return (await r.json()).categories;
+}

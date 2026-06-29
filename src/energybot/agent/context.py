@@ -5,6 +5,8 @@ from energybot.providers.base import ChatMessage
 from energybot.profile.render import render_profile_summary
 from energybot.profile.repository import ProfileRepository
 from energybot.chat.repository import ChatRepository
+from energybot.memory.render import render_memory
+from energybot.memory.repository import MemoryRepository
 
 
 @dataclass(slots=True)
@@ -16,10 +18,11 @@ class AssembledContext:
 
 
 class ContextAssembler:
-    def __init__(self, *, prompt_loader: Any, profile_repo: ProfileRepository, chat_repo: ChatRepository, recent_n: int = 10):
+    def __init__(self, *, prompt_loader: Any, profile_repo: ProfileRepository, chat_repo: ChatRepository, memory_repo: MemoryRepository, recent_n: int = 10):
         self._loader = prompt_loader
         self._profile_repo = profile_repo
         self._chat_repo = chat_repo
+        self._memory_repo = memory_repo
         self._recent_n = recent_n
 
     async def assemble(self, user_id: UUID, new_user_text: str) -> AssembledContext:
@@ -29,9 +32,12 @@ class ContextAssembler:
         )
         last_summary = await self._chat_repo.latest_summary(user_id)
         recent = await self._chat_repo.last_n_user_assistant(user_id, n=self._recent_n)
+        memory_items = await self._memory_repo.list_active(user_id)
+        user_memory = render_memory(memory_items)
         system_text, key, version = await self._loader.render("system_prompt", {
             "profile_summary": profile_summary,
             "rolling_summary": last_summary.text if last_summary else "",
+            "user_memory": user_memory,
         })
         messages: list[ChatMessage] = [ChatMessage(role="system", content=system_text)]
         for m in recent:
