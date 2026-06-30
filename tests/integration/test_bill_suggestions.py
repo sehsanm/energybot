@@ -199,3 +199,32 @@ async def test_generate_parse_failure_leaves_null(db_session):
     prof = await ProfileRepository(session_factory=lambda: db_session).get(u.id)
     assert prof.goals == []
     assert bale.sent == []
+
+
+async def test_regenerate_overwrites_and_returns_payload(db_session):
+    from energybot.billing.suggestions import regenerate_suggestions
+    from energybot.billing.repository import BillingRepository
+    u, b = await _user_profile_bill(db_session)
+    await BillingRepository(session_factory=lambda: db_session).set_bill_suggestions(
+        b.id, {"intro": "old", "tips": [], "targets": []})
+    router, loader = _FakeRouter(_GOOD), _FakeLoader()
+    payload = await regenerate_suggestions(
+        bill_db_id=b.id, session_factory=lambda: db_session, router=router, prompt_loader=loader)
+    assert router.calls == 1
+    assert payload["intro"] == "مصرفت بالاست"
+    row = (await db_session.execute(select(Bill).where(Bill.id == b.id))).scalar_one()
+    assert row.suggestions["intro"] == "مصرفت بالاست"  # overwritten
+    # regenerate must NOT touch goals
+    prof = await ProfileRepository(session_factory=lambda: db_session).get(u.id)
+    assert prof.goals == []
+
+
+async def test_regenerate_returns_none_on_parse_failure(db_session):
+    from energybot.billing.suggestions import regenerate_suggestions
+    u, b = await _user_profile_bill(db_session)
+    payload = await regenerate_suggestions(
+        bill_db_id=b.id, session_factory=lambda: db_session,
+        router=_FakeRouter("not json"), prompt_loader=_FakeLoader())
+    assert payload is None
+    row = (await db_session.execute(select(Bill).where(Bill.id == b.id))).scalar_one()
+    assert row.suggestions is None  # nothing written

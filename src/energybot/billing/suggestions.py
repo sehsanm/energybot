@@ -218,6 +218,39 @@ def _build_suggestion_context(bill, profile, prev) -> dict:
     }
 
 
+async def _render_and_parse(bill, profile, prev, *, router, prompt_loader) -> dict | None:
+    try:
+        body, key, version = await prompt_loader.render(
+            "bill_suggestions", _build_suggestion_context(bill, profile, prev))
+        req = ChatRequest(model="", messages=[ChatMessage(role="user", content=body)])
+        resp = await router.chat(call_type="bill_suggestions", req=req,
+                                 prompt_key=key, prompt_version=version)
+    except Exception as e:  # noqa: BLE001 — provider/render failures are non-fatal
+        log.warning("bill_suggestions_failed", error=str(e), bill_id=str(bill.id))
+        return None
+    parsed = _parse_suggestions_json(resp.content)
+    if parsed is None:
+        log.warning("bill_suggestions_parse_failed", bill_id=str(bill.id))
+        return None
+    return {
+        "generated_at": datetime.utcnow().isoformat(),
+        "intro": parsed["intro"], "tips": parsed["tips"], "targets": parsed["targets"],
+        "model": resp.model, "prompt_version": version,
+    }
+
+
+def _default_router(sf):
+    from energybot.providers.factory import build_providers
+    from energybot.providers.router import ProviderRouter
+    from energybot.settings import get_settings
+    return ProviderRouter(providers=build_providers(get_settings()), session_factory=sf)
+
+
+def _default_loader(sf):
+    from energybot.agent.prompts import PromptLoader
+    return PromptLoader(session_factory=sf)
+
+
 async def _generate(sf, *, user_id, chat_id, bill_db_id, router, prompt_loader, bale):
     from energybot.billing.repository import BillingRepository
     from energybot.profile.repository import ProfileRepository
@@ -240,41 +273,17 @@ async def _generate(sf, *, user_id, chat_id, bill_db_id, router, prompt_loader, 
     prev = prior[0] if prior else None
 
     if router is None:
-        from energybot.providers.factory import build_providers
-        from energybot.providers.router import ProviderRouter
-        from energybot.settings import get_settings
-        router = ProviderRouter(providers=build_providers(get_settings()), session_factory=sf)
+        router = _default_router(sf)
     if prompt_loader is None:
-        from energybot.agent.prompts import PromptLoader
-        prompt_loader = PromptLoader(session_factory=sf)
+        prompt_loader = _default_loader(sf)
 
-    try:
-        body, key, version = await prompt_loader.render(
-            "bill_suggestions", _build_suggestion_context(bill, profile, prev))
-        req = ChatRequest(model="", messages=[ChatMessage(role="user", content=body)])
-        resp = await router.chat(call_type="bill_suggestions", req=req,
-                                 prompt_key=key, prompt_version=version)
-    except Exception as e:  # noqa: BLE001 — provider/render failures are non-fatal
-        log.warning("bill_suggestions_failed", error=str(e), bill_id=str(bill_db_id))
+    payload = await _render_and_parse(bill, profile, prev, router=router, prompt_loader=prompt_loader)
+    if payload is None:
         return
-
-    parsed = _parse_suggestions_json(resp.content)
-    if parsed is None:
-        log.warning("bill_suggestions_parse_failed", bill_id=str(bill_db_id))
-        return
-
-    payload = {
-        "generated_at": datetime.utcnow().isoformat(),
-        "intro": parsed["intro"],
-        "tips": parsed["tips"],
-        "targets": parsed["targets"],
-        "model": resp.model,
-        "prompt_version": version,
-    }
     claimed = await billing_repo.set_bill_suggestions_if_absent(bill.id, payload)
     if not claimed:
         return  # another task already generated for this bill; it will send.
-    for goal in _build_targets_as_goals(parsed["targets"], str(bill.id)):
+    for goal in _build_targets_as_goals(payload["targets"], str(bill.id)):
         await profile_repo.append(user_id, "goals", goal,
                                   source="bill_suggestion", reason="هدف پیشنهادی از روی قبض")
     await bale.send_message(chat_id=chat_id, text=render_suggestions(payload))
@@ -293,3 +302,32 @@ async def generate_and_send_suggestions(
     async with Session() as session:
         await _generate(lambda: session, user_id=user_id, chat_id=chat_id, bill_db_id=bill_db_id,
                         router=router, prompt_loader=prompt_loader, bale=bale)
+
+
+async def _regenerate(sf, *, bill_db_id, router, prompt_loader):
+    from energybot.billing.repository import BillingRepository
+    from energybot.profile.repository import ProfileRepository
+    billing_repo = BillingRepository(session_factory=sf)
+    bill = await billing_repo.get_bill_by_id(bill_db_id)
+    if bill is None:
+        return None
+    profile = await ProfileRepository(session_factory=sf).get(bill.user_id)
+    prior = await billing_repo.prior_bills_for_subscription(
+        bill.subscription_id, before_bill_id=bill.id, limit=1)
+    prev = prior[0] if prior else None
+    router = router or _default_router(sf)
+    prompt_loader = prompt_loader or _default_loader(sf)
+    payload = await _render_and_parse(bill, profile, prev, router=router, prompt_loader=prompt_loader)
+    if payload is None:
+        return None
+    await billing_repo.set_bill_suggestions(bill.id, payload)
+    return payload
+
+
+async def regenerate_suggestions(*, bill_db_id: UUID, session_factory=None, router=None, prompt_loader=None) -> dict | None:
+    if session_factory is not None:
+        return await _regenerate(session_factory, bill_db_id=bill_db_id, router=router, prompt_loader=prompt_loader)
+    from energybot.core.db import get_sessionmaker
+    Session = get_sessionmaker()
+    async with Session() as session:
+        return await _regenerate(lambda: session, bill_db_id=bill_db_id, router=router, prompt_loader=prompt_loader)
