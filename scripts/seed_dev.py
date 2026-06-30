@@ -30,6 +30,8 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from energybot.core.db import get_sessionmaker  # noqa: E402
 from energybot.core.models import (  # noqa: E402
+    CityClimateZone,
+    IncentiveParamSet,
     KBArticle,
     KBChunk,
     ModelConfig,
@@ -291,6 +293,99 @@ async def _make_real_embed_fn(session_maker):
     return embed.embed_all
 
 
+# ---------- Incentives ----------
+
+# Representative Tavanir incentive numbers (rial). VERIFY against current figures
+# before production — the admin screen (/admin/incentives) exists to correct these.
+_INCENTIVE_SETS: list[dict] = [
+    {
+        "effective_year": 1404, "climate_zone": "normal", "label": "مناطق عادی ۱۴۰۴",
+        "params": {
+            "free_tier": {
+                "summer": {"pattern_kwh": 300, "low_user_kwh": 200},
+                "winter": {"pattern_kwh": 200, "low_user_kwh": 120},
+            },
+            "savings_reward": {
+                "min_reduction_pct": 10, "reward_pct_of_bill": 30,
+                "low_usage_threshold_kwh": 150, "per_kwh_rial_reward": 5000,
+                "monthly_cap_rial": 8_500_000,
+            },
+            "verified": False, "last_verified": "1404",
+        },
+    },
+    {
+        "effective_year": 1404, "climate_zone": "hot", "label": "مناطق گرمسیر ۱۴۰۴",
+        "params": {
+            "free_tier": {
+                "summer": {"pattern_kwh": 1500, "low_user_kwh": 1000},
+                "winter": {"pattern_kwh": 600, "low_user_kwh": 400},
+            },
+            "savings_reward": {
+                "min_reduction_pct": 10, "reward_pct_of_bill": 30,
+                "low_usage_threshold_kwh": 150, "per_kwh_rial_reward": 5000,
+                "monthly_cap_rial": 33_000_000,
+            },
+            "verified": False, "last_verified": "1404",
+        },
+    },
+]
+
+# Starter city -> climate zone list (illustrative; admin extends). Collapsed to the
+# two seeded zones (normal / hot) for v1.
+_CITY_ZONES: list[tuple[str, str, str]] = [
+    ("تهران", "تهران", "normal"),
+    ("مشهد", "خراسان رضوی", "normal"),
+    ("اصفهان", "اصفهان", "normal"),
+    ("شیراز", "فارس", "normal"),
+    ("تبریز", "آذربایجان شرقی", "normal"),
+    ("کرج", "البرز", "normal"),
+    ("قم", "قم", "normal"),
+    ("ارومیه", "آذربایجان غربی", "normal"),
+    ("رشت", "گیلان", "normal"),
+    ("کرمان", "کرمان", "normal"),
+    ("اهواز", "خوزستان", "hot"),
+    ("بندرعباس", "هرمزگان", "hot"),
+    ("بوشهر", "بوشهر", "hot"),
+    ("یزد", "یزد", "hot"),
+    ("زاهدان", "سیستان و بلوچستان", "hot"),
+    ("آبادان", "خوزستان", "hot"),
+]
+
+
+async def seed_incentives(session_maker, *, reset: bool = False) -> None:
+    async with session_maker() as s:
+        for spec in _INCENTIVE_SETS:
+            existing = (await s.execute(
+                select(IncentiveParamSet).where(
+                    IncentiveParamSet.effective_year == spec["effective_year"],
+                    IncentiveParamSet.climate_zone == spec["climate_zone"],
+                )
+            )).scalar_one_or_none()
+            if existing and not reset:
+                print(f"incentive {spec['climate_zone']}/{spec['effective_year']}: exists; skipping")
+                continue
+            if existing and reset:
+                existing.label = spec["label"]
+                existing.params = spec["params"]
+                existing.is_active = True
+                print(f"incentive {spec['climate_zone']}/{spec['effective_year']}: updated")
+            else:
+                s.add(IncentiveParamSet(
+                    effective_year=spec["effective_year"], climate_zone=spec["climate_zone"],
+                    label=spec["label"], params=spec["params"], is_active=True,
+                ))
+                print(f"incentive {spec['climate_zone']}/{spec['effective_year']}: inserted")
+        for city, province, zone in _CITY_ZONES:
+            norm = normalize_fa(city)
+            existing_c = (await s.execute(
+                select(CityClimateZone).where(CityClimateZone.city_name == norm)
+            )).scalar_one_or_none()
+            if existing_c:
+                continue
+            s.add(CityClimateZone(city_name=norm, province=province, climate_zone=zone, is_active=True))
+        await s.commit()
+
+
 # ---------- Main ----------
 
 async def main() -> None:
@@ -300,7 +395,7 @@ async def main() -> None:
     parser.add_argument("--real-embeddings", action="store_true", help="call configured embed provider (requires keys)")
     parser.add_argument("--keep-drafts", action="store_true", help="insert KB articles but leave them as draft")
     parser.add_argument("--force-articles", action="store_true", help="overwrite existing KB article bodies and re-chunk")
-    parser.add_argument("--skip", choices=["prompts", "models", "kb"], action="append", default=[],
+    parser.add_argument("--skip", choices=["prompts", "models", "kb", "incentives"], action="append", default=[],
                         help="skip a section (repeatable)")
     args = parser.parse_args()
 
@@ -320,6 +415,9 @@ async def main() -> None:
             real_embeddings=args.real_embeddings,
             force_articles=args.force_articles,
         )
+    if "incentives" not in args.skip:
+        print("== incentives ==")
+        await seed_incentives(session_maker, reset=args.reset_models)
 
     print("done.")
 
