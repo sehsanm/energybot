@@ -228,3 +228,33 @@ async def test_regenerate_returns_none_on_parse_failure(db_session):
     assert payload is None
     row = (await db_session.execute(select(Bill).where(Bill.id == b.id))).scalar_one()
     assert row.suggestions is None  # nothing written
+
+
+async def test_send_posts_to_user_and_replaces_goals(db_session):
+    from energybot.billing.suggestions import send_suggestions
+    from energybot.billing.repository import BillingRepository
+    u, b = await _user_profile_bill(db_session)
+    # Seed a stale bill-goal that must be replaced, plus an unrelated goal that must survive.
+    prof_repo = ProfileRepository(session_factory=lambda: db_session)
+    await prof_repo.replace_bill_goals(u.id, str(b.id), [
+        {"id": "stale", "text": "هدف قدیمی", "source": "bill_suggestion", "bill_id": str(b.id)}])
+    await prof_repo.append(u.id, "goals", "هدف دستی", source="manual", reason="x")
+    await BillingRepository(session_factory=lambda: db_session).set_bill_suggestions(b.id, {
+        "intro": "x", "tips": [], "targets": [{"text": "هدف تازه", "saving_kwh": 5}]})
+    bale = _FakeBale()
+    ok = await send_suggestions(bill_db_id=b.id, session_factory=lambda: db_session, bale=bale)
+    assert ok is True
+    assert bale.sent and bale.sent[0]  # posted to user
+    prof = await prof_repo.get(u.id)
+    texts = [g if isinstance(g, str) else g["text"] for g in prof.goals]
+    assert "هدف تازه" in texts and "هدف دستی" in texts
+    assert "هدف قدیمی" not in texts
+
+
+async def test_send_returns_false_when_no_suggestions(db_session):
+    from energybot.billing.suggestions import send_suggestions
+    u, b = await _user_profile_bill(db_session)  # suggestions is None
+    bale = _FakeBale()
+    ok = await send_suggestions(bill_db_id=b.id, session_factory=lambda: db_session, bale=bale)
+    assert ok is False
+    assert bale.sent == []

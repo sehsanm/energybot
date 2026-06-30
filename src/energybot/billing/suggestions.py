@@ -331,3 +331,32 @@ async def regenerate_suggestions(*, bill_db_id: UUID, session_factory=None, rout
     Session = get_sessionmaker()
     async with Session() as session:
         return await _regenerate(lambda: session, bill_db_id=bill_db_id, router=router, prompt_loader=prompt_loader)
+
+
+async def _send(sf, *, bill_db_id, bale) -> bool:
+    from sqlalchemy import select
+    from energybot.billing.repository import BillingRepository
+    from energybot.profile.repository import ProfileRepository
+    from energybot.core.models import User
+    billing_repo = BillingRepository(session_factory=sf)
+    bill = await billing_repo.get_bill_by_id(bill_db_id)
+    if bill is None or bill.suggestions is None:
+        return False
+    s = sf()
+    user = (await s.execute(select(User).where(User.id == bill.user_id))).scalar_one()
+    if bale is None:
+        from energybot.bale_adapter.handler import get_bale_client
+        bale = get_bale_client()
+    await bale.send_message(chat_id=user.bale_user_id, text=render_suggestions(bill.suggestions))
+    new_goals = _build_targets_as_goals(bill.suggestions.get("targets", []), str(bill.id))
+    await ProfileRepository(session_factory=sf).replace_bill_goals(bill.user_id, str(bill.id), new_goals)
+    return True
+
+
+async def send_suggestions(*, bill_db_id: UUID, session_factory=None, bale=None) -> bool:
+    if session_factory is not None:
+        return await _send(session_factory, bill_db_id=bill_db_id, bale=bale)
+    from energybot.core.db import get_sessionmaker
+    Session = get_sessionmaker()
+    async with Session() as session:
+        return await _send(lambda: session, bill_db_id=bill_db_id, bale=bale)
