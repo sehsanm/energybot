@@ -17,6 +17,7 @@ from energybot.admin_api.prompts import router as admin_prompts_router
 from energybot.admin_api.models import router as admin_models_router
 from energybot.admin_api.audit_log import router as admin_audit_router
 from energybot.admin_api.stats import router as admin_stats_router
+from energybot.admin_api.bills import router as admin_bills_router
 from energybot.user_api.auth import router as user_auth_router
 from energybot.user_api.chat import router as user_chat_router
 from energybot.user_api.bills import router as user_bills_router
@@ -109,6 +110,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_models_router)
     app.include_router(admin_audit_router)
     app.include_router(admin_stats_router)
+    app.include_router(admin_bills_router)
     app.include_router(user_auth_router)
     app.include_router(user_chat_router)
     app.include_router(user_bills_router)
