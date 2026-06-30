@@ -36,16 +36,30 @@ async def list_params(_: AdminUser = Depends(current_admin),
 
 
 @router.post("/params")
-async def create_param(payload: dict, _: AdminUser = Depends(current_admin),
+async def create_param(payload: dict, admin: AdminUser = Depends(current_admin),
                        s: AsyncSession = Depends(get_session)) -> dict[str, Any]:
+    year = int(payload["effective_year"])
+    zone = str(payload["climate_zone"]).strip()
+    existing = (await s.execute(
+        select(IncentiveParamSet).where(
+            IncentiveParamSet.effective_year == year,
+            IncentiveParamSet.climate_zone == zone,
+        )
+    )).scalar_one_or_none()
+    if existing is not None:
+        raise HTTPException(409, detail="param set exists")
     p = IncentiveParamSet(
-        effective_year=int(payload["effective_year"]),
-        climate_zone=str(payload["climate_zone"]).strip(),
+        effective_year=year,
+        climate_zone=zone,
         label=payload.get("label"),
         params=payload.get("params", {}),
         is_active=bool(payload.get("is_active", False)),
     )
     s.add(p)
+    await s.flush()
+    s.add(AuditLog(admin_user_id=admin.id, action="create_incentive_param_set",
+                   entity_type="incentive_param_set", entity_id=str(p.id),
+                   before=None, after=_param_dict(p)))
     await s.commit()
     return {"id": str(p.id)}
 
@@ -80,9 +94,10 @@ async def delete_param(param_id: UUID, admin: AdminUser = Depends(current_admin)
     p = (await s.execute(select(IncentiveParamSet).where(IncentiveParamSet.id == param_id))).scalar_one_or_none()
     if p is None:
         raise HTTPException(404)
+    before = _param_dict(p)
     await s.delete(p)
     s.add(AuditLog(admin_user_id=admin.id, action="delete_incentive_param_set",
-                   entity_type="incentive_param_set", entity_id=str(param_id), before=None, after=None))
+                   entity_type="incentive_param_set", entity_id=str(param_id), before=before, after=None))
     await s.commit()
     return {"ok": True}
 
@@ -97,15 +112,25 @@ async def list_cities(_: AdminUser = Depends(current_admin),
 
 
 @router.post("/cities")
-async def create_city(payload: dict, _: AdminUser = Depends(current_admin),
+async def create_city(payload: dict, admin: AdminUser = Depends(current_admin),
                       s: AsyncSession = Depends(get_session)) -> dict[str, Any]:
+    norm = normalize_fa(str(payload["city_name"]))
+    existing = (await s.execute(
+        select(CityClimateZone).where(CityClimateZone.city_name == norm)
+    )).scalar_one_or_none()
+    if existing is not None:
+        raise HTTPException(409, detail="city exists")
     c = CityClimateZone(
-        city_name=normalize_fa(str(payload["city_name"])),
+        city_name=norm,
         province=payload.get("province"),
         climate_zone=str(payload["climate_zone"]).strip(),
         is_active=bool(payload.get("is_active", True)),
     )
     s.add(c)
+    await s.flush()
+    s.add(AuditLog(admin_user_id=admin.id, action="create_city_climate_zone",
+                   entity_type="city_climate_zone", entity_id=str(c.id),
+                   before=None, after=_city_dict(c)))
     await s.commit()
     return {"id": str(c.id)}
 
@@ -138,8 +163,9 @@ async def delete_city(city_id: UUID, admin: AdminUser = Depends(current_admin),
     c = (await s.execute(select(CityClimateZone).where(CityClimateZone.id == city_id))).scalar_one_or_none()
     if c is None:
         raise HTTPException(404)
+    before = _city_dict(c)
     await s.delete(c)
     s.add(AuditLog(admin_user_id=admin.id, action="delete_city_climate_zone",
-                   entity_type="city_climate_zone", entity_id=str(city_id), before=None, after=None))
+                   entity_type="city_climate_zone", entity_id=str(city_id), before=before, after=None))
     await s.commit()
     return {"ok": True}

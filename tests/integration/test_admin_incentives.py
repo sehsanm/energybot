@@ -96,3 +96,58 @@ async def test_delete_param_set(app, db_session):
     assert r.status_code == 200
     remaining = (await db_session.execute(select(IncentiveParamSet))).scalars().all()
     assert remaining == []
+
+
+@pytest.mark.asyncio
+async def test_create_duplicate_city_returns_409(app, db_session):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+        hdr = await _login(c, db_session)
+        payload = {"city_name": "تهران", "province": "تهران", "climate_zone": "normal"}
+        r1 = await c.post("/api/admin/incentives/cities", headers=hdr, json=payload)
+        assert r1.status_code == 200
+        r2 = await c.post("/api/admin/incentives/cities", headers=hdr, json=payload)
+        assert r2.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_create_duplicate_param_returns_409(app, db_session):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+        hdr = await _login(c, db_session)
+        payload = {"effective_year": 1404, "climate_zone": "warm", "params": {}}
+        r1 = await c.post("/api/admin/incentives/params", headers=hdr, json=payload)
+        assert r1.status_code == 200
+        r2 = await c.post("/api/admin/incentives/params", headers=hdr, json=payload)
+        assert r2.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_create_param_writes_audit(app, db_session):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+        hdr = await _login(c, db_session)
+        r = await c.post("/api/admin/incentives/params", headers=hdr, json={
+            "effective_year": 1405, "climate_zone": "cold", "params": {}, "is_active": True,
+        })
+        assert r.status_code == 200
+        new_id = r.json()["id"]
+    rows = (await db_session.execute(
+        select(AuditLog).where(AuditLog.entity_id == new_id)
+    )).scalars().all()
+    assert any(row.action == "create_incentive_param_set" for row in rows)
+
+
+@pytest.mark.asyncio
+async def test_delete_param_set_captures_before(app, db_session):
+    ps = IncentiveParamSet(effective_year=1404, climate_zone="semi-arid", params={"k": 1}, is_active=True)
+    db_session.add(ps)
+    await db_session.commit()
+    pid = str(ps.id)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+        hdr = await _login(c, db_session)
+        r = await c.delete(f"/api/admin/incentives/params/{ps.id}", headers=hdr)
+    assert r.status_code == 200
+    rows = (await db_session.execute(
+        select(AuditLog).where(AuditLog.entity_id == pid)
+    )).scalars().all()
+    delete_log = next((row for row in rows if row.action == "delete_incentive_param_set"), None)
+    assert delete_log is not None
+    assert delete_log.before is not None
