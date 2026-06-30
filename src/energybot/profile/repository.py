@@ -86,6 +86,22 @@ class ProfileRepository:
         ))
         await s.commit()
 
+    async def replace_bill_goals(self, user_id: UUID, bill_id: str, new_goals: list[dict]) -> None:
+        s = self._session_factory()
+        p = (await s.execute(select(Profile).where(Profile.user_id == user_id))).scalar_one()
+        current = list(p.goals or [])
+        kept = [g for g in current if not (
+            isinstance(g, dict) and g.get("source") == "bill_suggestion" and g.get("bill_id") == bill_id
+        )]
+        p.goals = kept + list(new_goals)
+        p.completeness_score = _compute_completeness(p)
+        s.add(ProfileEvent(
+            user_id=user_id, field_path="goals[bill_suggestion]",
+            before={"removed": len(current) - len(kept)}, after={"added": len(new_goals)},
+            source="bill_suggestion", reason="بازتولید پیشنهادهای قبض",
+        ))
+        await s.commit()
+
     async def append(self, user_id: UUID, section: str, item: Any, *, source: str, reason: str, source_message_id: int | None = None) -> None:
         if section not in ("goals", "commitments"):
             raise ValueError(f"append only supports goals|commitments, got {section!r}")

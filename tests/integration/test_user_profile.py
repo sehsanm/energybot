@@ -111,3 +111,25 @@ async def test_bad_section_404(app, db_session):
         u, csrf = await _login(c, db_session, 705705)
         r = await c.post("/api/app/profile/behaviour", json={"text": "x"}, headers={"x-csrf": csrf})
     assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_replace_bill_goals_swaps_only_matching_bill(db_session):
+    from uuid import uuid4
+    from energybot.core.models import User, Profile
+    from energybot.profile.repository import ProfileRepository
+    u = User(bale_user_id=int(uuid4().int % 1_000_000_000))
+    db_session.add(u)
+    await db_session.flush()
+    db_session.add(Profile(user_id=u.id, goals=[
+        "هدف دستی",  # plain string goal — must survive
+        {"id": "a", "text": "old", "source": "bill_suggestion", "bill_id": "BILL1"},
+        {"id": "b", "text": "keep", "source": "bill_suggestion", "bill_id": "BILL2"},
+    ]))
+    await db_session.commit()
+    repo = ProfileRepository(session_factory=lambda: db_session)
+    await repo.replace_bill_goals(u.id, "BILL1", [{"id": "c", "text": "new", "source": "bill_suggestion", "bill_id": "BILL1"}])
+    prof = await repo.get(u.id)
+    texts = [g if isinstance(g, str) else g["text"] for g in prof.goals]
+    assert "هدف دستی" in texts and "keep" in texts and "new" in texts
+    assert "old" not in texts
