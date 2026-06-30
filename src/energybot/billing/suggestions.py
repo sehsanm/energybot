@@ -118,13 +118,48 @@ def _build_targets_as_goals(targets: list[dict], bill_id: str) -> list[dict]:
     ]
 
 
+def _to_number(v):
+    """Coerce a value to a number for arithmetic.
+
+    Bill fields arrive already numeric, but profile values are free-form
+    strings — notably ``area_m2`` is stored as a bucket like ``"<60"`` or
+    ``"100-150"`` (the wizard never numifies it). Map those to a representative
+    number so density ratios stay meaningful instead of crashing on int/str.
+    """
+    if v is None or isinstance(v, bool):
+        return None
+    if isinstance(v, (int, float)):
+        return v
+    s = str(v).translate(_FA_DIGITS).replace(",", "").replace("٫", ".").strip()
+    if not s:
+        return None
+    try:
+        return float(s)
+    except ValueError:
+        pass
+    body = s.lstrip("<>≤≥").rstrip("+").strip()  # "<60" / ">200" / "5+" -> their bound
+    try:
+        return float(body)
+    except ValueError:
+        pass
+    if "-" in body:  # "100-150" -> midpoint
+        lo, _, hi = body.partition("-")
+        try:
+            return (float(lo) + float(hi)) / 2
+        except ValueError:
+            return None
+    return None
+
+
 def _pct(part, total):
+    part, total = _to_number(part), _to_number(total)
     if part is None or not total:
         return None
     return round(100 * part / total)
 
 
 def _ratio(total, divisor, ndigits=1):
+    total, divisor = _to_number(total), _to_number(divisor)
     if total is None or not divisor:
         return None
     return round(total / divisor, ndigits)

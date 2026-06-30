@@ -172,6 +172,23 @@ def test_context_handles_missing_details_without_error():
     assert ctx["amount_toman"] == 200_000  # falls back to bill.amount//10
 
 
+def test_context_area_m2_stored_as_range_string():
+    # The profile wizard stores area_m2 as a bucket string ("<60", "100-150", ...),
+    # never a number. Building the suggestion context must not crash on int/str
+    # division and should derive kwh_per_m2 from the bucket midpoint.
+    bill = _fake_bill(consumption={"total": 400}, period={"days": 60})
+    prof = _fake_profile(household={"occupants": "5+", "area_m2": "100-150"})
+    ctx = _build_suggestion_context(bill, prof, None)
+    assert ctx["kwh_per_m2"] == round(400 / 125, 1)  # midpoint of 100-150
+    assert ctx["kwh_per_person"] == round(400 / 5, 1)  # "5+" -> 5
+
+
+def test_context_area_m2_open_ended_buckets():
+    bill = _fake_bill(consumption={"total": 300})
+    assert _build_suggestion_context(bill, _fake_profile(household={"area_m2": "<60"}), None)["kwh_per_m2"] == round(300 / 60, 1)
+    assert _build_suggestion_context(bill, _fake_profile(household={"area_m2": ">200"}), None)["kwh_per_m2"] == round(300 / 200, 1)
+
+
 def test_context_prev_delta():
     bill = _fake_bill(consumption={"total": 400}, amounts={"period": 2_000_000})
     prev = _fake_bill(consumption={"total": 300}, amounts={"period": 1_000_000})
