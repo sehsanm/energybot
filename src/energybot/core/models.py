@@ -312,6 +312,33 @@ class BillPayment(Base):
     paid_at: Mapped[datetime | None] = mapped_column()
 
 
+class IncentiveParamSet(Base):
+    __tablename__ = "incentive_param_set"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    effective_year: Mapped[int] = mapped_column(Integer, nullable=False)
+    climate_zone: Mapped[str] = mapped_column(String(40), nullable=False)
+    label: Mapped[str | None] = mapped_column(String(200))
+    params: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
+    __table_args__ = (
+        UniqueConstraint("effective_year", "climate_zone", name="uq_incentive_year_zone"),
+    )
+
+
+class CityClimateZone(Base):
+    __tablename__ = "city_climate_zone"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    city_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    province: Mapped[str | None] = mapped_column(String(120))
+    climate_zone: Mapped[str] = mapped_column(String(40), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    __table_args__ = (
+        UniqueConstraint("city_name", name="uq_city_climate_zone_city"),
+        Index("ix_city_climate_zone_city", "city_name"),
+    )
+
+
 class WebLoginToken(Base):
     __tablename__ = "web_login_tokens"
     token_hash: Mapped[str] = mapped_column(String(128), primary_key=True)

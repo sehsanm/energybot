@@ -16,6 +16,8 @@ async def clean_router_tables(db_session):
     await db_session.execute(text("DELETE FROM llm_calls"))
     await db_session.execute(text("DELETE FROM model_configs"))
     await db_session.execute(text("DELETE FROM prompt_templates"))
+    await db_session.execute(text("DELETE FROM incentive_param_set"))
+    await db_session.execute(text("DELETE FROM city_climate_zone"))
     # Children first to avoid FK violations
     await db_session.execute(text("DELETE FROM messages"))
     await db_session.execute(text("DELETE FROM chat_summaries"))
@@ -50,6 +52,8 @@ async def clean_router_tables(db_session):
     await db_session.execute(text("DELETE FROM llm_calls"))
     await db_session.execute(text("DELETE FROM model_configs"))
     await db_session.execute(text("DELETE FROM prompt_templates"))
+    await db_session.execute(text("DELETE FROM incentive_param_set"))
+    await db_session.execute(text("DELETE FROM city_climate_zone"))
     # Children first to avoid FK violations
     await db_session.execute(text("DELETE FROM messages"))
     await db_session.execute(text("DELETE FROM chat_summaries"))
