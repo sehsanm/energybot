@@ -20,6 +20,11 @@ export const api = {
   logout: () => request("/logout", { method: "POST" }),
   listUsers: () => request<{ users: any[] }>("/users"),
   getUser: (id: string) => request<{ user: any; profile: any; sessions: any[] }>(`/users/${id}`),
+  getUserBills: (id: string) => request<{ bills: any[] }>(`/users/${id}/bills`),
+  regenerateBillSuggestions: (userId: string, billId: string) =>
+    request<{ suggestions: any }>(`/users/${userId}/bills/${billId}/suggestions/regenerate`, { method: "POST" }),
+  sendBillSuggestions: (userId: string, billId: string) =>
+    request<{ ok: boolean }>(`/users/${userId}/bills/${billId}/suggestions/send`, { method: "POST" }),
   listChats: () => request<{ sessions: any[] }>("/chats"),
   getChat: (id: string) => request<{ messages: any[] }>(`/chats/${id}`),
   listArticles: () => request<{ articles: any[] }>("/kb/articles"),

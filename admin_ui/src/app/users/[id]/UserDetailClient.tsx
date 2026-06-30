@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/PageHeader";
 import { api } from "@/lib/api";
 import { useUrlId } from "@/lib/useUrlId";
+import { BillsSection } from "./BillsSection";
 
 function fmtDate(s?: string | null) {
   if (!s) return "—";
@@ -137,6 +138,7 @@ export default function UserDetailClient() {
             )}
           </CardContent>
         </Card>
+        <BillsSection userId={u.id} />
       </div>
     </>
   );
