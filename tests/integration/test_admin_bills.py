@@ -110,3 +110,31 @@ async def test_send_ok_and_409(app, db_session, monkeypatch):
         r2 = await c.post(f"/api/admin/users/{u.id}/bills/{b.id}/suggestions/send", headers=hdr)
     assert r1.status_code == 200 and r1.json()["ok"] is True
     assert r2.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_regenerate_502_on_generation_failure(app, db_session, monkeypatch):
+    u, b = await _user_with_bill(db_session)
+    async def fake_regen(**kw):
+        return None
+    monkeypatch.setattr("energybot.billing.suggestions.regenerate_suggestions", fake_regen)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+        hdr = await _login(c, db_session)
+        r = await c.post(f"/api/admin/users/{u.id}/bills/{b.id}/suggestions/regenerate", headers=hdr)
+    assert r.status_code == 502
+
+
+@pytest.mark.asyncio
+async def test_send_writes_audit_log(app, db_session, monkeypatch):
+    from sqlalchemy import select
+    from energybot.core.models import AuditLog
+    u, b = await _user_with_bill(db_session)
+    async def fake_send(**kw):
+        return True
+    monkeypatch.setattr("energybot.billing.suggestions.send_suggestions", fake_send)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+        hdr = await _login(c, db_session)
+        r = await c.post(f"/api/admin/users/{u.id}/bills/{b.id}/suggestions/send", headers=hdr)
+    assert r.status_code == 200
+    rows = (await db_session.execute(select(AuditLog).where(AuditLog.entity_id == str(b.id)))).scalars().all()
+    assert any(row.action == "send_bill_suggestions" for row in rows)

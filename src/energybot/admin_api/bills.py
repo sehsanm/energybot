@@ -57,7 +57,12 @@ async def send_bill_suggestions(user_id: UUID, bill_id: UUID,
                                 admin: AdminUser = Depends(current_admin),
                                 s: AsyncSession = Depends(get_session)) -> dict[str, Any]:
     await _owned_bill(s, user_id, bill_id)
-    ok = await suggestions_mod.send_suggestions(bill_db_id=bill_id, session_factory=lambda: s)
+    try:
+        ok = await suggestions_mod.send_suggestions(bill_db_id=bill_id, session_factory=lambda: s)
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001 — surface Bale/post failures as 502
+        raise HTTPException(502, detail="send failed") from e
     if not ok:
         raise HTTPException(409, detail="no suggestions to send")
     s.add(AuditLog(admin_user_id=admin.id, action="send_bill_suggestions",

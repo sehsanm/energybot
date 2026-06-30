@@ -77,12 +77,23 @@ export function BillsSection({ userId }: { userId: string }) {
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <Badge variant="outline">{b.utility_type}</Badge>
+                <Badge variant="outline">{b.status}</Badge>
                 <span className="text-sm text-muted-foreground">دوره {b.term ?? "—"}</span>
               </div>
               <span className="font-mono text-sm tabular-nums text-foreground">
                 {Number(b.amount).toLocaleString("fa-IR")} ریال
               </span>
             </div>
+            {b.consumption != null && (
+              <p className="text-sm text-muted-foreground">
+                مصرف: {Number(b.consumption).toLocaleString("fa-IR")} کیلووات‌ساعت
+              </p>
+            )}
+            {b.details && typeof b.details === "object" && Object.keys(b.details).length > 0 && (
+              <pre className="overflow-x-auto rounded-md bg-muted/50 p-2 text-xs">
+                {JSON.stringify(b.details, null, 2)}
+              </pre>
+            )}
             <Suggestions s={b.suggestions} />
             <div className="flex gap-2">
               <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => regenerate(b.id)}>
