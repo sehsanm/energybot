@@ -12,6 +12,7 @@ import {
   Sparkles,
   Cpu,
   ScrollText,
+  BadgePercent,
   Zap,
   X,
   type LucideIcon,
@@ -47,7 +48,10 @@ const groups: NavGroup[] = [
   },
   {
     label: "سیستم",
-    items: [{ href: "/audit-log", label: "گزارش تغییرات", icon: ScrollText }],
+    items: [
+      { href: "/incentives", label: "مشوق‌ها", icon: BadgePercent },
+      { href: "/audit-log", label: "گزارش تغییرات", icon: ScrollText },
+    ],
   },
 ];
 
