@@ -34,11 +34,19 @@ export default function IncentivesPage() {
   const [province, setProvince] = useState("");
   const [cityZone, setCityZone] = useState("normal");
   const [savingC, setSavingC] = useState(false);
+  const [loadErr, setLoadErr] = useState("");
 
   async function load() {
-    const [p, c] = await Promise.all([api.listIncentiveParams(), api.listCityZones()]);
-    setParams(p.params);
-    setCities(c.cities);
+    setLoadErr("");
+    try {
+      const [p, c] = await Promise.all([api.listIncentiveParams(), api.listCityZones()]);
+      setParams(p.params);
+      setCities(c.cities);
+    } catch {
+      setLoadErr("خطا در بارگذاری داده‌ها");
+      setParams([]);   // break the skeleton
+      setCities([]);
+    }
   }
   useEffect(() => { load(); }, []);
 
@@ -88,6 +96,7 @@ export default function IncentivesPage() {
       />
 
       <div className="space-y-6">
+        {loadErr && <p className="text-sm text-destructive px-1">{loadErr}</p>}
         {/* Param sets */}
         <div className="grid gap-6 lg:grid-cols-5">
           <Card className="lg:col-span-2">
