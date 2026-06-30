@@ -33,7 +33,11 @@ export function BillsSection({ userId }: { userId: string }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
-  useEffect(() => { api.getUserBills(userId).then((d) => setBills(d.bills)); }, [userId]);
+  useEffect(() => {
+    api.getUserBills(userId)
+      .then((d) => setBills(d.bills))
+      .catch((e: any) => { setBills([]); setMsg("خطا در بارگذاری قبض‌ها: " + e.message); });
+  }, [userId]);
 
   async function regenerate(billId: string) {
     setBusy(billId + ":regen"); setMsg(null);
