@@ -18,6 +18,7 @@ class UpdateCallback:
     chat_id: int
     callback_id: str
     data: str
+    message_id: int | None
 
 
 @dataclass(slots=True)
@@ -90,5 +91,6 @@ def parse_update(d: dict) -> Union[UpdateText, UpdateCallback, UpdatePhoto, Upda
             chat_id=int(c.get("message", {}).get("chat", {}).get("id", c["from"]["id"])),
             callback_id=str(c["id"]),
             data=str(c.get("data", "")),
+            message_id=(c.get("message", {}) or {}).get("message_id"),
         )
     return UpdateUnknown(update_id=int(upd))
