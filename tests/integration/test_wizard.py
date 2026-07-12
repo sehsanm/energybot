@@ -50,4 +50,7 @@ async def test_full_wizard_completes_and_writes_profile(db_session):
     assert p.household["home_type"] == "آپارتمان"
     assert p.household["occupants"] == 3
     state = (await db_session.execute(select(OnboardingState).where(OnboardingState.user_id == u.id))).scalar_one()
-    assert state.completed_at is not None
+    # Wizard hands off to the motivations phase instead of completing onboarding.
+    from energybot.onboarding.flow import STEP_MOTIVATIONS
+    assert state.completed_at is None
+    assert state.current_step == STEP_MOTIVATIONS

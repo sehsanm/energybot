@@ -91,12 +91,13 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
             await _send_step(bale, parsed.chat_id, step)
             return
         if text == "/start":
-            current = await wizard.current_step(user.id)
-            if current is not None:
-                # Mid-wizard: resume where they left off.
-                await _send_step(bale, parsed.chat_id, current)
-            else:
+            from energybot.onboarding import flow
+            st = await flow.load_state(session, user.id)
+            phase = flow.active_phase(st)
+            if phase is None:
                 await _send_home(bale, parsed.chat_id)
+            else:
+                await _resend_phase(bale, session_factory, wizard, user.id, parsed.chat_id, phase)
             return
         if text == "/help":
             await _send_home(bale, parsed.chat_id)
@@ -141,17 +142,24 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
             await _process_typed_bill(bale, session_factory, user.id, parsed.chat_id, arg)
             return
 
-        current = await wizard.current_step(user.id)
-        if current is not None:
+        from energybot.onboarding import flow
+        st = await flow.load_state(session, user.id)
+        phase = flow.active_phase(st)
+        if phase == flow.PHASE_PROFILE:
             if is_wizard_answer(text):
                 next_step = await wizard.answer(user.id, text)
                 if next_step is None:
-                    await _send_home(bale, parsed.chat_id)
+                    await _enter_motivations(bale, session_factory, user.id, parsed.chat_id)
                     return
                 await _send_step(bale, parsed.chat_id, next_step)
                 return
             else:
                 await wizard.abandon(user.id)
+        elif phase == flow.PHASE_MOTIVATIONS:
+            if is_wizard_answer(text):
+                await _enter_motivations(bale, session_factory, user.id, parsed.chat_id)
+                return
+            # a real question falls through to the agent; phase is retained
 
         # A bare bill id typed in (after tapping "قبض من", or pasted directly) looks
         # like ordinary text, so route it to the billing service before the LLM agent —
@@ -196,11 +204,14 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
                 return
             await bale.send_message(chat_id=parsed.chat_id, text=f"برای پرداخت روی این لینک بزن:\n{url}")
             return
+        if parsed.data.startswith("ms:"):
+            await _handle_multiselect(bale, session, session_factory, profile_repo, user, parsed, parsed.data)
+            return
         current = await wizard.current_step(user.id)
         if current is not None:
             next_step = await wizard.answer(user.id, parsed.data)
             if next_step is None:
-                await _send_home(bale, parsed.chat_id)
+                await _enter_motivations(bale, session_factory, user.id, parsed.chat_id)
             else:
                 await _send_step(bale, parsed.chat_id, next_step)
 
@@ -214,6 +225,58 @@ async def _send_home(bale: BaleClient, chat_id: int) -> None:
     from energybot.bale_adapter.home import build_home_message
     text, markup = build_home_message()
     await bale.send_message(chat_id=chat_id, text=text, reply_markup=markup)
+
+
+async def _enter_motivations(bale, session_factory, user_id, chat_id) -> None:
+    from energybot.bale_adapter.multiselect import build_markup
+    from energybot.onboarding import content
+    markup = build_markup("motivations", content.MOTIVATION_OPTIONS, [], allow_skip=False)
+    await bale.send_message(chat_id=chat_id, text=content.MOTIVATIONS_PROMPT, reply_markup=markup)
+
+
+async def _resend_phase(bale, session_factory, wizard, user_id, chat_id, phase) -> None:
+    from energybot.onboarding import flow
+    if phase == flow.PHASE_PROFILE:
+        step = await wizard.current_step(user_id)
+        if step is not None:
+            await _send_step(bale, chat_id, step)
+    elif phase == flow.PHASE_MOTIVATIONS:
+        await _enter_motivations(bale, session_factory, user_id, chat_id)
+
+
+async def _handle_multiselect(bale, session, session_factory, profile_repo, user, parsed, data) -> None:
+    from energybot.bale_adapter.multiselect import parse_ms_callback, build_markup
+    from energybot.onboarding import flow, content
+    got = parse_ms_callback(data)
+    if got is None:
+        return
+    field, key = got
+    options = {"motivations": content.MOTIVATION_OPTIONS, "toolbox": content.TOOLBOX_OPTIONS}.get(field)
+    prompt = {"motivations": content.MOTIVATIONS_PROMPT, "toolbox": content.TOOLBOX_PROMPT}.get(field)
+    if options is None:
+        return
+    if key == "__done__":
+        selected = await flow.get_draft(session_factory, user.id, field)
+        if field == "motivations":
+            await profile_repo.set(user.id, "behaviour.motivations", selected, source="wizard", reason="onboarding:motivations")
+            await flow.clear_draft(session_factory, user.id, field)
+            # TEMPORARY terminal for Task 5; Task 6 replaces this with _enter_first_bill.
+            await flow.complete(session_factory, user.id)
+            await _send_home(bale, parsed.chat_id)
+        return
+    if key == "__skip__":
+        return
+    selected = await flow.toggle_draft(session_factory, user.id, field, key)
+    st = await flow.load_state(session, user.id)
+    allow_skip = field == "toolbox" and flow.active_phase(st) is not None
+    markup = build_markup(field, options, selected, allow_skip=allow_skip)
+    if parsed.message_id is not None:
+        try:
+            await bale.edit_message_reply_markup(chat_id=parsed.chat_id, message_id=parsed.message_id, reply_markup=markup)
+            return
+        except Exception:  # noqa: BLE001 — stale/old message: fall back to a fresh one
+            pass
+    await bale.send_message(chat_id=parsed.chat_id, text=prompt, reply_markup=markup)
 
 
 async def _send_step(bale: BaleClient, chat_id: int, step) -> None:
