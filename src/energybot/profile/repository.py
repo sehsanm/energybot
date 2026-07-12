@@ -102,6 +102,18 @@ class ProfileRepository:
         ))
         await s.commit()
 
+    async def set_service_prefs(self, user_id: UUID, keys: list[str], *, source: str, reason: str) -> None:
+        s = self._session_factory()
+        p = (await s.execute(select(Profile).where(Profile.user_id == user_id))).scalar_one()
+        before = list(p.service_prefs or [])
+        p.service_prefs = list(keys)
+        s.add(ProfileEvent(
+            user_id=user_id, field_path="service_prefs",
+            before={"value": before}, after={"value": list(keys)},
+            source=source, reason=reason,
+        ))
+        await s.commit()
+
     async def append(self, user_id: UUID, section: str, item: Any, *, source: str, reason: str, source_message_id: int | None = None) -> None:
         if section not in ("goals", "commitments"):
             raise ValueError(f"append only supports goals|commitments, got {section!r}")
