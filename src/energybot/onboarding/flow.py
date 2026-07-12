@@ -34,23 +34,22 @@ def active_phase(state: OnboardingState | None) -> str | None:
     return _SENTINEL_TO_PHASE.get(state.current_step, PHASE_PROFILE)
 
 
-async def _get(session_factory: Callable[[], AsyncSession], user_id: UUID) -> OnboardingState:
-    s = session_factory()
-    return (await s.execute(
+async def _get(session: AsyncSession, user_id: UUID) -> OnboardingState:
+    return (await session.execute(
         select(OnboardingState).where(OnboardingState.user_id == user_id)
     )).scalar_one()
 
 
 async def set_step(session_factory, user_id: UUID, step: str) -> None:
     s = session_factory()
-    st = await _get(session_factory, user_id)
+    st = await _get(s, user_id)
     st.current_step = step
     await s.commit()
 
 
 async def complete(session_factory, user_id: UUID) -> None:
     s = session_factory()
-    st = await _get(session_factory, user_id)
+    st = await _get(s, user_id)
     if st.completed_at is None:
         st.completed_at = datetime.utcnow()
         await s.commit()
@@ -61,20 +60,21 @@ def _draft_key(field: str) -> str:
 
 
 async def get_draft(session_factory, user_id: UUID, field: str) -> list[str]:
-    st = await _get(session_factory, user_id)
+    s = session_factory()
+    st = await _get(s, user_id)
     return list(st.answers.get(_draft_key(field), []))
 
 
 async def seed_draft(session_factory, user_id: UUID, field: str, keys) -> None:
     s = session_factory()
-    st = await _get(session_factory, user_id)
+    st = await _get(s, user_id)
     st.answers = {**st.answers, _draft_key(field): list(keys)}
     await s.commit()
 
 
 async def toggle_draft(session_factory, user_id: UUID, field: str, key: str) -> list[str]:
     s = session_factory()
-    st = await _get(session_factory, user_id)
+    st = await _get(s, user_id)
     cur = list(st.answers.get(_draft_key(field), []))
     if key in cur:
         cur.remove(key)
@@ -87,7 +87,7 @@ async def toggle_draft(session_factory, user_id: UUID, field: str, key: str) -> 
 
 async def clear_draft(session_factory, user_id: UUID, field: str) -> None:
     s = session_factory()
-    st = await _get(session_factory, user_id)
+    st = await _get(s, user_id)
     a = dict(st.answers)
     a.pop(_draft_key(field), None)
     st.answers = a
