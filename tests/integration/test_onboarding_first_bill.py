@@ -70,15 +70,15 @@ async def test_elec_button_sends_help(db_session, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_skip_first_bill_completes_to_home(db_session, monkeypatch):
+async def test_skip_first_bill_enters_toolbox(db_session, monkeypatch):
     bale = FakeBale(); _wire(monkeypatch, bale)
     await _through_motivations(db_session, 922)
     await handle_bale_update(_cb(922, "ob:bill:skip", 30), session_factory=lambda: db_session)
-    from energybot.bale_adapter.home import HOME_TEXT
-    assert bale.sent[-1]["text"] == HOME_TEXT
+    from energybot.onboarding.content import TOOLBOX_PROMPT
+    assert bale.sent[-1]["text"] == TOOLBOX_PROMPT
     u = (await db_session.execute(select(User).where(User.bale_user_id == 922))).scalar_one()
     st = (await db_session.execute(select(OnboardingState).where(OnboardingState.user_id == u.id))).scalar_one()
-    assert st.completed_at is not None
+    assert st.completed_at is None
 
 
 class _FakeRes:
@@ -95,12 +95,12 @@ class _FakeBillingService:
 
 
 @pytest.mark.asyncio
-async def test_captured_bill_completes_to_home(db_session, monkeypatch):
+async def test_captured_bill_enters_toolbox(db_session, monkeypatch):
     bale = FakeBale(); _wire(monkeypatch, bale)
     monkeypatch.setattr("energybot.bale_adapter.handler.build_billing_service", lambda sf: _FakeBillingService())
     # Also stub the bill-id detector so the typed text routes to billing.
     monkeypatch.setattr("energybot.bale_adapter.handler._looks_like_bill_id", lambda t: True)
     await _through_motivations(db_session, 923)
     await handle_bale_update(_text(923, "1234567890", 30), session_factory=lambda: db_session)
-    from energybot.bale_adapter.home import HOME_TEXT
-    assert any(s["text"] == HOME_TEXT for s in bale.sent)
+    from energybot.onboarding.content import TOOLBOX_PROMPT
+    assert bale.sent[-1]["text"] == TOOLBOX_PROMPT

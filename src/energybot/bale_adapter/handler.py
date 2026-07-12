@@ -168,6 +168,11 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
                 await _enter_first_bill(bale, session_factory, user.id, parsed.chat_id)
                 return
             # a real question falls through to the agent; phase is retained
+        elif phase == flow.PHASE_TOOLBOX:
+            if is_wizard_answer(text):
+                await _send_toolbox(bale, session_factory, user.id, parsed.chat_id, allow_skip=True)
+                return
+            # a real question falls through to the agent; phase is retained
 
         # A bare bill id typed in (after tapping "قبض من", or pasted directly) looks
         # like ordinary text, so route it to the billing service before the LLM agent —
@@ -268,9 +273,23 @@ async def _maybe_advance_first_bill(bale, session_factory, user_id, chat_id) -> 
     s = session_factory()
     st = await flow.load_state(s, user_id)
     if flow.active_phase(st) == flow.PHASE_FIRST_BILL:
-        # TEMPORARY terminal for Task 6; Task 7 replaces this with _enter_toolbox.
-        await flow.complete(session_factory, user_id)
-        await _send_home(bale, chat_id)
+        await _enter_toolbox(bale, session_factory, user_id, chat_id)
+
+
+async def _send_toolbox(bale, session_factory, user_id, chat_id, *, seed=None, allow_skip: bool) -> None:
+    from energybot.bale_adapter.multiselect import build_markup
+    from energybot.onboarding import flow, content
+    if seed is not None:
+        await flow.seed_draft(session_factory, user_id, "toolbox", seed)
+    selected = await flow.get_draft(session_factory, user_id, "toolbox")
+    markup = build_markup("toolbox", content.TOOLBOX_OPTIONS, selected, allow_skip=allow_skip)
+    await bale.send_message(chat_id=chat_id, text=content.TOOLBOX_PROMPT, reply_markup=markup)
+
+
+async def _enter_toolbox(bale, session_factory, user_id, chat_id) -> None:
+    from energybot.onboarding import flow
+    await flow.set_step(session_factory, user_id, flow.STEP_TOOLBOX)
+    await _send_toolbox(bale, session_factory, user_id, chat_id, seed=[], allow_skip=True)
 
 
 async def _resend_phase(bale, session_factory, wizard, user_id, chat_id, phase) -> None:
@@ -283,6 +302,8 @@ async def _resend_phase(bale, session_factory, wizard, user_id, chat_id, phase) 
         await _enter_motivations(bale, session_factory, user_id, chat_id)
     elif phase == flow.PHASE_FIRST_BILL:
         await _enter_first_bill(bale, session_factory, user_id, chat_id)
+    elif phase == flow.PHASE_TOOLBOX:
+        await _send_toolbox(bale, session_factory, user_id, chat_id, allow_skip=True)
 
 
 async def _handle_multiselect(bale, session, session_factory, profile_repo, user, parsed, data) -> None:
@@ -302,8 +323,21 @@ async def _handle_multiselect(bale, session, session_factory, profile_repo, user
             await profile_repo.set(user.id, "behaviour.motivations", selected, source="wizard", reason="onboarding:motivations")
             await flow.clear_draft(session_factory, user.id, field)
             await _enter_first_bill(bale, session_factory, user.id, parsed.chat_id)
+        else:  # toolbox
+            await profile_repo.set_service_prefs(user.id, selected, source="onboarding", reason="onboarding:toolbox")
+            await flow.clear_draft(session_factory, user.id, field)
+            st = await flow.load_state(session, user.id)
+            if flow.active_phase(st) == flow.PHASE_TOOLBOX:
+                await flow.complete(session_factory, user.id)
+                await _send_home(bale, parsed.chat_id)
+            else:
+                await bale.send_message(chat_id=parsed.chat_id, text=content.TOOLBOX_UPDATED)
         return
     if key == "__skip__":
+        if field == "toolbox":
+            await flow.clear_draft(session_factory, user.id, field)
+            await flow.complete(session_factory, user.id)
+            await _send_home(bale, parsed.chat_id)
         return
     selected = await flow.toggle_draft(session_factory, user.id, field, key)
     st = await flow.load_state(session, user.id)
