@@ -1,4 +1,4 @@
-COMMANDS = {"/start", "/help", "/profile", "/forget", "/restart"}
+COMMANDS = {"/start", "/help", "/profile", "/forget", "/restart", "/tools"}
 
 
 def is_command(text: str) -> bool:
@@ -16,5 +16,6 @@ BOT_COMMAND_MENU = [
     {"command": "profile", "description": "مشاهده پروفایل"},
     {"command": "bill", "description": "استعلام و پرداخت قبض"},
     {"command": "web", "description": "ورود به نسخهٔ وب"},
+    {"command": "tools", "description": "ابزارها و تنظیم سرویس‌ها"},
     {"command": "restart", "description": "شروع گفتگوی تازه"},
 ]

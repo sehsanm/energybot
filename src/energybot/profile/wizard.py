@@ -83,6 +83,8 @@ class WizardEngine:
         state = (await s.execute(select(OnboardingState).where(OnboardingState.user_id == user_id))).scalar_one_or_none()
         if state is None or state.completed_at is not None:
             return None
+        if state.current_step not in _STEP_BY_KEY:
+            return None
         cur = _STEP_BY_KEY[state.current_step]
         return WizardStep(key=cur.key, prompt=cur.prompt, buttons=cur.buttons)
 
@@ -106,6 +108,7 @@ class WizardEngine:
             await s.commit()
             nxt = STEPS[idx + 1]
             return WizardStep(key=nxt.key, prompt=nxt.prompt, buttons=nxt.buttons)
-        state.completed_at = datetime.utcnow()
+        from energybot.onboarding.flow import STEP_MOTIVATIONS
+        state.current_step = STEP_MOTIVATIONS
         await s.commit()
         return None

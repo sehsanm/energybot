@@ -32,6 +32,7 @@ class Profile(Base):
     behaviour: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
     goals: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
     commitments: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
+    service_prefs: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
     completeness_score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
     deleted_at: Mapped[datetime | None] = mapped_column()

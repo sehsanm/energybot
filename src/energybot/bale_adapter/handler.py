@@ -49,7 +49,7 @@ def build_agent_for_user(user_id, chat_id, session_factory):
     return build_agent(user_id=user_id, channel=BaleChannel(get_bale_client(), chat_id), session_factory=session_factory)
 
 
-async def _send_capture(bale, chat_id, res, user_id):
+async def _send_capture(bale, chat_id, res, user_id, session_factory) -> None:
     if not res.ok:
         await bale.send_message(chat_id=chat_id, text=res.error)
         return
@@ -57,6 +57,7 @@ async def _send_capture(bale, chat_id, res, user_id):
     await bale.send_message(chat_id=chat_id, text=res.summary, reply_markup=markup)
     if res.bill_db_id:
         _spawn_suggestions(user_id, chat_id, UUID(res.bill_db_id))
+    await _maybe_advance_first_bill(bale, session_factory, user_id, chat_id)
 
 
 async def _ensure_user_and_profile(session: AsyncSession, bale_user_id: int, display_name: str | None) -> User:
@@ -91,12 +92,13 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
             await _send_step(bale, parsed.chat_id, step)
             return
         if text == "/start":
-            current = await wizard.current_step(user.id)
-            if current is not None:
-                # Mid-wizard: resume where they left off.
-                await _send_step(bale, parsed.chat_id, current)
-            else:
+            from energybot.onboarding import flow
+            st = await flow.load_state(session, user.id)
+            phase = flow.active_phase(st)
+            if phase is None:
                 await _send_home(bale, parsed.chat_id)
+            else:
+                await _resend_phase(bale, session_factory, wizard, user.id, parsed.chat_id, phase)
             return
         if text == "/help":
             await _send_home(bale, parsed.chat_id)
@@ -106,6 +108,9 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
             return
         if text == "/profile":
             await _send_profile(bale, session, session_factory, user, parsed.chat_id)
+            return
+        if text == "/tools":
+            await _open_toolbox_editor(bale, session_factory, user.id, parsed.chat_id)
             return
         if text == "/restart":
             await bale.send_message(chat_id=parsed.chat_id, text="گفتگوی تازه آغاز شد. در چه موردی صحبت کنیم؟")
@@ -131,6 +136,8 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
                 await _send_web(bale, session, user, parsed.chat_id)
             elif kind == "bill":
                 await _send_bill_prompt(bale, parsed.chat_id)
+            elif kind == "toolbox":
+                await _open_toolbox_editor(bale, session_factory, user.id, parsed.chat_id)
             return
 
         if text.startswith("/bill"):
@@ -141,17 +148,36 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
             await _process_typed_bill(bale, session_factory, user.id, parsed.chat_id, arg)
             return
 
-        current = await wizard.current_step(user.id)
-        if current is not None:
+        from energybot.onboarding import flow
+        st = await flow.load_state(session, user.id)
+        phase = flow.active_phase(st)
+        if phase == flow.PHASE_PROFILE:
             if is_wizard_answer(text):
                 next_step = await wizard.answer(user.id, text)
                 if next_step is None:
-                    await _send_home(bale, parsed.chat_id)
+                    await _enter_motivations(bale, session_factory, user.id, parsed.chat_id)
                     return
                 await _send_step(bale, parsed.chat_id, next_step)
                 return
             else:
                 await wizard.abandon(user.id)
+        elif phase == flow.PHASE_MOTIVATIONS:
+            if is_wizard_answer(text):
+                await _enter_motivations(bale, session_factory, user.id, parsed.chat_id)
+                return
+            # a real question falls through to the agent; phase is retained
+        elif phase == flow.PHASE_FIRST_BILL:
+            if _looks_like_bill_id(text):
+                pass  # falls through to the typed-bill path below, which advances via _send_capture
+            elif is_wizard_answer(text):
+                await _enter_first_bill(bale, session_factory, user.id, parsed.chat_id)
+                return
+            # a real question falls through to the agent; phase is retained
+        elif phase == flow.PHASE_TOOLBOX:
+            if is_wizard_answer(text):
+                await _send_toolbox(bale, session_factory, user.id, parsed.chat_id, allow_skip=True)
+                return
+            # a real question falls through to the agent; phase is retained
 
         # A bare bill id typed in (after tapping "قبض من", or pasted directly) looks
         # like ordinary text, so route it to the billing service before the LLM agent —
@@ -173,7 +199,7 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
             get_logger(__name__).exception("photo_billing_failed", chat_id=parsed.chat_id)
             await bale.send_message(chat_id=parsed.chat_id, text="نتونستم عکس رو پردازش کنم. دوباره امتحان کن.")
             return
-        await _send_capture(bale, parsed.chat_id, res, user.id)
+        await _send_capture(bale, parsed.chat_id, res, user.id, session_factory)
         return
 
     elif isinstance(parsed, UpdateDocument):
@@ -196,11 +222,24 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
                 return
             await bale.send_message(chat_id=parsed.chat_id, text=f"برای پرداخت روی این لینک بزن:\n{url}")
             return
+        if parsed.data.startswith("ob:bill:"):
+            from energybot.onboarding import content
+            choice = parsed.data[len("ob:bill:"):]
+            if choice == "skip":
+                await _maybe_advance_first_bill(bale, session_factory, user.id, parsed.chat_id)
+            elif choice == "elec":
+                await bale.send_message(chat_id=parsed.chat_id, text=content.FIRST_BILL_ELEC_HELP)
+            elif choice == "gas":
+                await bale.send_message(chat_id=parsed.chat_id, text=content.FIRST_BILL_GAS_HELP)
+            return
+        if parsed.data.startswith("ms:"):
+            await _handle_multiselect(bale, session, session_factory, profile_repo, user, parsed, parsed.data)
+            return
         current = await wizard.current_step(user.id)
         if current is not None:
             next_step = await wizard.answer(user.id, parsed.data)
             if next_step is None:
-                await _send_home(bale, parsed.chat_id)
+                await _enter_motivations(bale, session_factory, user.id, parsed.chat_id)
             else:
                 await _send_step(bale, parsed.chat_id, next_step)
 
@@ -214,6 +253,115 @@ async def _send_home(bale: BaleClient, chat_id: int) -> None:
     from energybot.bale_adapter.home import build_home_message
     text, markup = build_home_message()
     await bale.send_message(chat_id=chat_id, text=text, reply_markup=markup)
+
+
+async def _enter_motivations(bale, session_factory, user_id, chat_id) -> None:
+    from energybot.bale_adapter.multiselect import build_markup
+    from energybot.onboarding import flow, content
+    selected = await flow.get_draft(session_factory, user_id, "motivations")
+    markup = build_markup("motivations", content.MOTIVATION_OPTIONS, selected, allow_skip=False)
+    await bale.send_message(chat_id=chat_id, text=content.MOTIVATIONS_PROMPT, reply_markup=markup)
+
+
+async def _enter_first_bill(bale, session_factory, user_id, chat_id) -> None:
+    from energybot.onboarding import flow, content
+    await flow.set_step(session_factory, user_id, flow.STEP_FIRST_BILL)
+    markup = {"inline_keyboard": [
+        [{"text": "قبض برق ⚡", "callback_data": "ob:bill:elec"},
+         {"text": "قبض گاز 🔥", "callback_data": "ob:bill:gas"}],
+        [{"text": "فعلاً نه", "callback_data": "ob:bill:skip"}],
+    ]}
+    await bale.send_message(chat_id=chat_id, text=content.FIRST_BILL_PROMPT, reply_markup=markup)
+
+
+async def _maybe_advance_first_bill(bale, session_factory, user_id, chat_id) -> None:
+    from energybot.onboarding import flow
+    s = session_factory()
+    st = await flow.load_state(s, user_id)
+    if flow.active_phase(st) == flow.PHASE_FIRST_BILL:
+        await _enter_toolbox(bale, session_factory, user_id, chat_id)
+
+
+async def _send_toolbox(bale, session_factory, user_id, chat_id, *, seed=None, allow_skip: bool) -> None:
+    from energybot.bale_adapter.multiselect import build_markup
+    from energybot.onboarding import flow, content
+    if seed is not None:
+        await flow.seed_draft(session_factory, user_id, "toolbox", seed)
+    selected = await flow.get_draft(session_factory, user_id, "toolbox")
+    markup = build_markup("toolbox", content.TOOLBOX_OPTIONS, selected, allow_skip=allow_skip)
+    await bale.send_message(chat_id=chat_id, text=content.TOOLBOX_PROMPT, reply_markup=markup)
+
+
+async def _open_toolbox_editor(bale, session_factory, user_id, chat_id) -> None:
+    repo = ProfileRepository(session_factory=session_factory)
+    p = await repo.get(user_id)
+    await _send_toolbox(bale, session_factory, user_id, chat_id, seed=list(p.service_prefs or []), allow_skip=False)
+
+
+async def _enter_toolbox(bale, session_factory, user_id, chat_id) -> None:
+    from energybot.onboarding import flow
+    await flow.set_step(session_factory, user_id, flow.STEP_TOOLBOX)
+    await _send_toolbox(bale, session_factory, user_id, chat_id, seed=[], allow_skip=True)
+
+
+async def _resend_phase(bale, session_factory, wizard, user_id, chat_id, phase) -> None:
+    from energybot.onboarding import flow
+    if phase == flow.PHASE_PROFILE:
+        step = await wizard.current_step(user_id)
+        if step is not None:
+            await _send_step(bale, chat_id, step)
+    elif phase == flow.PHASE_MOTIVATIONS:
+        await _enter_motivations(bale, session_factory, user_id, chat_id)
+    elif phase == flow.PHASE_FIRST_BILL:
+        await _enter_first_bill(bale, session_factory, user_id, chat_id)
+    elif phase == flow.PHASE_TOOLBOX:
+        await _send_toolbox(bale, session_factory, user_id, chat_id, allow_skip=True)
+
+
+async def _handle_multiselect(bale, session, session_factory, profile_repo, user, parsed, data) -> None:
+    from energybot.bale_adapter.multiselect import parse_ms_callback, build_markup
+    from energybot.onboarding import flow, content
+    got = parse_ms_callback(data)
+    if got is None:
+        return
+    field, key = got
+    options = {"motivations": content.MOTIVATION_OPTIONS, "toolbox": content.TOOLBOX_OPTIONS}.get(field)
+    prompt = {"motivations": content.MOTIVATIONS_PROMPT, "toolbox": content.TOOLBOX_PROMPT}.get(field)
+    if options is None:
+        return
+    if key == "__done__":
+        selected = await flow.get_draft(session_factory, user.id, field)
+        if field == "motivations":
+            await profile_repo.set(user.id, "behaviour.motivations", selected, source="wizard", reason="onboarding:motivations")
+            await flow.clear_draft(session_factory, user.id, field)
+            await _enter_first_bill(bale, session_factory, user.id, parsed.chat_id)
+        else:  # toolbox
+            await profile_repo.set_service_prefs(user.id, selected, source="onboarding", reason="onboarding:toolbox")
+            await flow.clear_draft(session_factory, user.id, field)
+            st = await flow.load_state(session, user.id)
+            if flow.active_phase(st) == flow.PHASE_TOOLBOX:
+                await flow.complete(session_factory, user.id)
+                await _send_home(bale, parsed.chat_id)
+            else:
+                await bale.send_message(chat_id=parsed.chat_id, text=content.TOOLBOX_UPDATED)
+        return
+    if key == "__skip__":
+        if field == "toolbox":
+            await flow.clear_draft(session_factory, user.id, field)
+            await flow.complete(session_factory, user.id)
+            await _send_home(bale, parsed.chat_id)
+        return
+    selected = await flow.toggle_draft(session_factory, user.id, field, key)
+    st = await flow.load_state(session, user.id)
+    allow_skip = field == "toolbox" and flow.active_phase(st) is not None
+    markup = build_markup(field, options, selected, allow_skip=allow_skip)
+    if parsed.message_id is not None:
+        try:
+            await bale.edit_message_reply_markup(chat_id=parsed.chat_id, message_id=parsed.message_id, reply_markup=markup)
+            return
+        except Exception:  # noqa: BLE001 — stale/old message: fall back to a fresh one
+            pass
+    await bale.send_message(chat_id=parsed.chat_id, text=prompt, reply_markup=markup)
 
 
 async def _send_step(bale: BaleClient, chat_id: int, step) -> None:
@@ -281,7 +429,7 @@ async def _handle_bill_document(bale, session_factory, user_id, parsed) -> None:
         get_logger(__name__).exception("document_billing_failed", chat_id=parsed.chat_id)
         await bale.send_message(chat_id=parsed.chat_id, text="نتونستم فایل را پردازش کنم. دوباره امتحان کن.")
         return
-    await _send_capture(bale, parsed.chat_id, res, user_id)
+    await _send_capture(bale, parsed.chat_id, res, user_id, session_factory)
 
 
 def _looks_like_bill_id(text: str) -> bool:
@@ -304,7 +452,7 @@ async def _process_typed_bill(bale, session_factory, user_id, chat_id, arg) -> N
         get_logger(__name__).exception("bill_command_failed", chat_id=chat_id)
         await bale.send_message(chat_id=chat_id, text="متأسفم، در پردازش قبض مشکلی پیش اومد. بعداً دوباره امتحان کن.")
         return
-    await _send_capture(bale, chat_id, res, user_id)
+    await _send_capture(bale, chat_id, res, user_id, session_factory)
 
 
 async def _reply_with_agent(bale, user, chat_id, text, session_factory) -> None:
@@ -336,6 +484,8 @@ async def _dispatch_quick_action(bale, session, session_factory, user, chat_id, 
         await _send_web(bale, session, user, chat_id)
     elif action.kind == "bill":
         await _send_bill_prompt(bale, chat_id)
+    elif action.kind == "toolbox":
+        await _open_toolbox_editor(bale, session_factory, user.id, chat_id)
     elif action.kind == "prompt":
         await _reply_with_agent(bale, user, chat_id, action.prompt, session_factory)
     else:

@@ -13,6 +13,8 @@ class FakeBale:
 
     async def send_chat_action(self, *, chat_id, action="typing"): pass
     async def answer_callback_query(self, **kw): pass
+    async def edit_message_reply_markup(self, *, chat_id, message_id, reply_markup):
+        self.sent.append({"chat_id": chat_id, "text": None, "reply_markup": reply_markup, "edit": message_id})
 
 
 class FakeAgent:
@@ -38,6 +40,13 @@ async def _onboard(db_session, uid):
     await handle_bale_update(_text(uid, "/start", 1), session_factory=lambda: db_session)
     for i, ans in enumerate(["تهران", "آپارتمان", "2", "60-100", "پکیج", "اسپلیت", "کاهش قبض برق"], start=2):
         await handle_bale_update(_text(uid, ans, i), session_factory=lambda: db_session)
+    # Commit the motivations phase, skip the first-bill prompt, then skip the
+    # toolbox phase too, so onboarding is fully done and later messages in
+    # these tests reach the agent rather than re-showing a widget.
+    await handle_bale_update(_cb(uid, "ms:motivations:reduce_bill", 20), session_factory=lambda: db_session)
+    await handle_bale_update(_cb(uid, "ms:motivations:__done__", 21), session_factory=lambda: db_session)
+    await handle_bale_update(_cb(uid, "ob:bill:skip", 22), session_factory=lambda: db_session)
+    await handle_bale_update(_cb(uid, "ms:toolbox:__skip__", 23), session_factory=lambda: db_session)
 
 
 def _wire(monkeypatch, bale, agent):

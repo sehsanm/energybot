@@ -38,6 +38,11 @@ class BaleClient:
     async def answer_callback_query(self, *, callback_query_id: str, text: str | None = None) -> None:
         await self._post_json("answerCallbackQuery", {"callback_query_id": callback_query_id, "text": text or ""})
 
+    async def edit_message_reply_markup(self, *, chat_id: int, message_id: int, reply_markup: dict) -> None:
+        await self._post_json("editMessageReplyMarkup", {
+            "chat_id": chat_id, "message_id": message_id, "reply_markup": reply_markup,
+        })
+
     async def set_my_commands(self, commands: list[dict]) -> None:
         # Registers Bale's native "/" command menu. Best-effort: a transient
         # failure at startup must not crash the app.

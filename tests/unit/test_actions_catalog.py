@@ -7,13 +7,13 @@ from energybot.bale_adapter.actions import (
 
 def test_catalog_has_expected_keys():
     assert set(CATALOG_KEYS) == {
-        "view_profile", "query_bill", "web_login", "saving_tips", "set_goal", "more_help",
+        "view_profile", "query_bill", "web_login", "saving_tips", "set_goal", "toolbox", "more_help",
     }
     for key, action in CATALOG.items():
         assert isinstance(action, QuickAction)
         assert action.key == key
         assert action.label  # non-empty Persian label
-        assert action.kind in {"profile", "bill", "web", "home", "prompt"}
+        assert action.kind in {"profile", "bill", "web", "home", "prompt", "toolbox"}
         if action.kind == "prompt":
             assert action.prompt
 
@@ -36,7 +36,8 @@ def test_build_suggestions_markup_drops_unknown_and_empty():
 
 def test_reply_kb_routes_cover_core_four():
     assert REPLY_KB_ROUTES == {
-        "قبض من": "bill", "پروفایل": "profile", "نسخه وب": "web", "راهنما": "home",
+        "قبض من": "bill", "پروفایل": "profile", "ابزارها": "toolbox",
+        "نسخه وب": "web", "راهنما": "home",
     }
 
 

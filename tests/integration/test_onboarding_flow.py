@@ -8,13 +8,17 @@ from energybot.agent.result import AgentResult
 class FakeBale:
     def __init__(self):
         self.sent = []
+        self._mid = 0
 
     async def send_message(self, *, chat_id, text, reply_markup=None):
+        self._mid += 1
         self.sent.append({"chat_id": chat_id, "text": text, "reply_markup": reply_markup})
-        return 1
+        return self._mid
 
     async def send_chat_action(self, *, chat_id, action="typing"): pass
     async def answer_callback_query(self, **kw): pass
+    async def edit_message_reply_markup(self, *, chat_id, message_id, reply_markup):
+        self.sent.append({"chat_id": chat_id, "text": None, "reply_markup": reply_markup, "edit": message_id})
 
 
 class FakeAgent:
@@ -35,6 +39,12 @@ def _text(uid, t, update_id=1):
 def _cb(uid, data, update_id=1):
     return {"update_id": update_id, "callback_query": {"id": "cb1", "from": {"id": uid},
             "message": {"message_id": 1, "chat": {"id": uid}}, "data": data}}
+
+
+async def _commit_motivations(db_session, uid, update_id):
+    # Select one motivation, then press "تأیید".
+    await handle_bale_update(_cb(uid, "ms:motivations:reduce_bill", update_id), session_factory=lambda: db_session)
+    await handle_bale_update(_cb(uid, "ms:motivations:__done__", update_id + 1), session_factory=lambda: db_session)
 
 
 @pytest.mark.asyncio
@@ -59,6 +69,9 @@ async def test_returning_user_start_shows_home_not_wizard(db_session, monkeypatc
     await handle_bale_update(_text(902, "/start", 1), session_factory=lambda: db_session)
     for i, ans in enumerate(["تهران", "آپارتمان", "2", "60-100", "پکیج", "اسپلیت", "کاهش قبض برق"], start=2):
         await handle_bale_update(_text(902, ans, i), session_factory=lambda: db_session)
+    await _commit_motivations(db_session, 902, 20)
+    await handle_bale_update(_cb(902, "ob:bill:skip", 30), session_factory=lambda: db_session)
+    await handle_bale_update(_cb(902, "ms:toolbox:__skip__", 31), session_factory=lambda: db_session)
     bale.sent.clear()
     # Now /start again -> home screen with reply keyboard, no new wizard step.
     await handle_bale_update(_text(902, "/start", 99), session_factory=lambda: db_session)
@@ -88,6 +101,9 @@ async def test_wizard_completion_shows_home(db_session, monkeypatch):
     answers = ["تهران", "آپارتمان", "2", "60-100", "پکیج", "اسپلیت", "کاهش قبض برق"]
     for i, ans in enumerate(answers, start=2):
         await handle_bale_update(_text(904, ans, i), session_factory=lambda: db_session)
+    await _commit_motivations(db_session, 904, 20)
+    await handle_bale_update(_cb(904, "ob:bill:skip", 30), session_factory=lambda: db_session)
+    await handle_bale_update(_cb(904, "ms:toolbox:__skip__", 31), session_factory=lambda: db_session)
     from energybot.bale_adapter.home import HOME_TEXT
     assert bale.sent[-1]["text"] == HOME_TEXT
     assert bale.sent[-1]["reply_markup"]["keyboard"]
@@ -113,6 +129,9 @@ async def test_wizard_completion_via_callback_shows_home(db_session, monkeypatch
     ]
     for i, val in enumerate(cb_answers, start=3):
         await handle_bale_update(_cb(uid, val, update_id=i), session_factory=lambda: db_session)
+    await _commit_motivations(db_session, 905, 20)
+    await handle_bale_update(_cb(905, "ob:bill:skip", 30), session_factory=lambda: db_session)
+    await handle_bale_update(_cb(905, "ms:toolbox:__skip__", 31), session_factory=lambda: db_session)
     from energybot.bale_adapter.home import HOME_TEXT
     assert bale.sent[-1]["text"] == HOME_TEXT
     assert bale.sent[-1]["reply_markup"]["keyboard"]
