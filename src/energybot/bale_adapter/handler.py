@@ -109,6 +109,9 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
         if text == "/profile":
             await _send_profile(bale, session, session_factory, user, parsed.chat_id)
             return
+        if text == "/tools":
+            await _open_toolbox_editor(bale, session_factory, user.id, parsed.chat_id)
+            return
         if text == "/restart":
             await bale.send_message(chat_id=parsed.chat_id, text="گفتگوی تازه آغاز شد. در چه موردی صحبت کنیم؟")
             return
@@ -133,6 +136,8 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
                 await _send_web(bale, session, user, parsed.chat_id)
             elif kind == "bill":
                 await _send_bill_prompt(bale, parsed.chat_id)
+            elif kind == "toolbox":
+                await _open_toolbox_editor(bale, session_factory, user.id, parsed.chat_id)
             return
 
         if text.startswith("/bill"):
@@ -284,6 +289,12 @@ async def _send_toolbox(bale, session_factory, user_id, chat_id, *, seed=None, a
     selected = await flow.get_draft(session_factory, user_id, "toolbox")
     markup = build_markup("toolbox", content.TOOLBOX_OPTIONS, selected, allow_skip=allow_skip)
     await bale.send_message(chat_id=chat_id, text=content.TOOLBOX_PROMPT, reply_markup=markup)
+
+
+async def _open_toolbox_editor(bale, session_factory, user_id, chat_id) -> None:
+    repo = ProfileRepository(session_factory=session_factory)
+    p = await repo.get(user_id)
+    await _send_toolbox(bale, session_factory, user_id, chat_id, seed=list(p.service_prefs or []), allow_skip=False)
 
 
 async def _enter_toolbox(bale, session_factory, user_id, chat_id) -> None:
@@ -472,6 +483,8 @@ async def _dispatch_quick_action(bale, session, session_factory, user, chat_id, 
         await _send_web(bale, session, user, chat_id)
     elif action.kind == "bill":
         await _send_bill_prompt(bale, chat_id)
+    elif action.kind == "toolbox":
+        await _open_toolbox_editor(bale, session_factory, user.id, chat_id)
     elif action.kind == "prompt":
         await _reply_with_agent(bale, user, chat_id, action.prompt, session_factory)
     else:

@@ -15,7 +15,8 @@ HOME_TEXT = (
 REPLY_KEYBOARD = {
     "keyboard": [
         [{"text": "قبض من"}, {"text": "پروفایل"}],
-        [{"text": "نسخه وب"}, {"text": "راهنما"}],
+        [{"text": "ابزارها"}, {"text": "نسخه وب"}],
+        [{"text": "راهنما"}],
     ],
     "resize_keyboard": True,
 }

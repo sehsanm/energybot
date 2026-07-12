@@ -5,7 +5,7 @@ from dataclasses import dataclass
 class QuickAction:
     key: str
     label: str           # Persian button label
-    kind: str            # "profile" | "bill" | "web" | "home" | "prompt"
+    kind: str            # "profile" | "bill" | "web" | "home" | "prompt" | "toolbox"
     prompt: str | None = None  # required when kind == "prompt"
 
     def __post_init__(self):
@@ -25,6 +25,7 @@ CATALOG: dict[str, QuickAction] = {
         "set_goal", "تعیین هدف", "prompt",
         "می‌خوام یک هدف صرفه‌جویی انرژی تعیین کنم. کمکم کن یک هدف مشخص و قابل‌اندازه‌گیری بذارم.",
     ),
+    "toolbox": QuickAction("toolbox", "ابزارها", "toolbox"),
     "more_help": QuickAction("more_help", "راهنما", "home"),
 }
 
@@ -34,6 +35,7 @@ CATALOG_KEYS: list[str] = list(CATALOG.keys())
 REPLY_KB_ROUTES: dict[str, str] = {
     "قبض من": "bill",
     "پروفایل": "profile",
+    "ابزارها": "toolbox",
     "نسخه وب": "web",
     "راهنما": "home",
 }
