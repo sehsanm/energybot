@@ -49,7 +49,7 @@ def build_agent_for_user(user_id, chat_id, session_factory):
     return build_agent(user_id=user_id, channel=BaleChannel(get_bale_client(), chat_id), session_factory=session_factory)
 
 
-async def _send_capture(bale, chat_id, res, user_id):
+async def _send_capture(bale, chat_id, res, user_id, session_factory) -> None:
     if not res.ok:
         await bale.send_message(chat_id=chat_id, text=res.error)
         return
@@ -57,6 +57,7 @@ async def _send_capture(bale, chat_id, res, user_id):
     await bale.send_message(chat_id=chat_id, text=res.summary, reply_markup=markup)
     if res.bill_db_id:
         _spawn_suggestions(user_id, chat_id, UUID(res.bill_db_id))
+    await _maybe_advance_first_bill(bale, session_factory, user_id, chat_id)
 
 
 async def _ensure_user_and_profile(session: AsyncSession, bale_user_id: int, display_name: str | None) -> User:
@@ -160,6 +161,13 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
                 await _enter_motivations(bale, session_factory, user.id, parsed.chat_id)
                 return
             # a real question falls through to the agent; phase is retained
+        elif phase == flow.PHASE_FIRST_BILL:
+            if _looks_like_bill_id(text):
+                pass  # falls through to the typed-bill path below, which advances via _send_capture
+            elif is_wizard_answer(text):
+                await _enter_first_bill(bale, session_factory, user.id, parsed.chat_id)
+                return
+            # a real question falls through to the agent; phase is retained
 
         # A bare bill id typed in (after tapping "قبض من", or pasted directly) looks
         # like ordinary text, so route it to the billing service before the LLM agent —
@@ -181,7 +189,7 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
             get_logger(__name__).exception("photo_billing_failed", chat_id=parsed.chat_id)
             await bale.send_message(chat_id=parsed.chat_id, text="نتونستم عکس رو پردازش کنم. دوباره امتحان کن.")
             return
-        await _send_capture(bale, parsed.chat_id, res, user.id)
+        await _send_capture(bale, parsed.chat_id, res, user.id, session_factory)
         return
 
     elif isinstance(parsed, UpdateDocument):
@@ -203,6 +211,16 @@ async def handle_bale_update(body: dict[str, Any], *, session_factory: Callable[
                 await bale.send_message(chat_id=parsed.chat_id, text="ایجاد لینک پرداخت ناموفق بود. بعداً امتحان کن.")
                 return
             await bale.send_message(chat_id=parsed.chat_id, text=f"برای پرداخت روی این لینک بزن:\n{url}")
+            return
+        if parsed.data.startswith("ob:bill:"):
+            from energybot.onboarding import content
+            choice = parsed.data[len("ob:bill:"):]
+            if choice == "skip":
+                await _maybe_advance_first_bill(bale, session_factory, user.id, parsed.chat_id)
+            elif choice == "elec":
+                await bale.send_message(chat_id=parsed.chat_id, text=content.FIRST_BILL_ELEC_HELP)
+            elif choice == "gas":
+                await bale.send_message(chat_id=parsed.chat_id, text=content.FIRST_BILL_GAS_HELP)
             return
         if parsed.data.startswith("ms:"):
             await _handle_multiselect(bale, session, session_factory, profile_repo, user, parsed, parsed.data)
@@ -234,6 +252,27 @@ async def _enter_motivations(bale, session_factory, user_id, chat_id) -> None:
     await bale.send_message(chat_id=chat_id, text=content.MOTIVATIONS_PROMPT, reply_markup=markup)
 
 
+async def _enter_first_bill(bale, session_factory, user_id, chat_id) -> None:
+    from energybot.onboarding import flow, content
+    await flow.set_step(session_factory, user_id, flow.STEP_FIRST_BILL)
+    markup = {"inline_keyboard": [
+        [{"text": "قبض برق ⚡", "callback_data": "ob:bill:elec"},
+         {"text": "قبض گاز 🔥", "callback_data": "ob:bill:gas"}],
+        [{"text": "فعلاً نه", "callback_data": "ob:bill:skip"}],
+    ]}
+    await bale.send_message(chat_id=chat_id, text=content.FIRST_BILL_PROMPT, reply_markup=markup)
+
+
+async def _maybe_advance_first_bill(bale, session_factory, user_id, chat_id) -> None:
+    from energybot.onboarding import flow
+    s = session_factory()
+    st = await flow.load_state(s, user_id)
+    if flow.active_phase(st) == flow.PHASE_FIRST_BILL:
+        # TEMPORARY terminal for Task 6; Task 7 replaces this with _enter_toolbox.
+        await flow.complete(session_factory, user_id)
+        await _send_home(bale, chat_id)
+
+
 async def _resend_phase(bale, session_factory, wizard, user_id, chat_id, phase) -> None:
     from energybot.onboarding import flow
     if phase == flow.PHASE_PROFILE:
@@ -242,6 +281,8 @@ async def _resend_phase(bale, session_factory, wizard, user_id, chat_id, phase) 
             await _send_step(bale, chat_id, step)
     elif phase == flow.PHASE_MOTIVATIONS:
         await _enter_motivations(bale, session_factory, user_id, chat_id)
+    elif phase == flow.PHASE_FIRST_BILL:
+        await _enter_first_bill(bale, session_factory, user_id, chat_id)
 
 
 async def _handle_multiselect(bale, session, session_factory, profile_repo, user, parsed, data) -> None:
@@ -260,9 +301,7 @@ async def _handle_multiselect(bale, session, session_factory, profile_repo, user
         if field == "motivations":
             await profile_repo.set(user.id, "behaviour.motivations", selected, source="wizard", reason="onboarding:motivations")
             await flow.clear_draft(session_factory, user.id, field)
-            # TEMPORARY terminal for Task 5; Task 6 replaces this with _enter_first_bill.
-            await flow.complete(session_factory, user.id)
-            await _send_home(bale, parsed.chat_id)
+            await _enter_first_bill(bale, session_factory, user.id, parsed.chat_id)
         return
     if key == "__skip__":
         return
@@ -344,7 +383,7 @@ async def _handle_bill_document(bale, session_factory, user_id, parsed) -> None:
         get_logger(__name__).exception("document_billing_failed", chat_id=parsed.chat_id)
         await bale.send_message(chat_id=parsed.chat_id, text="نتونستم فایل را پردازش کنم. دوباره امتحان کن.")
         return
-    await _send_capture(bale, parsed.chat_id, res, user_id)
+    await _send_capture(bale, parsed.chat_id, res, user_id, session_factory)
 
 
 def _looks_like_bill_id(text: str) -> bool:
@@ -367,7 +406,7 @@ async def _process_typed_bill(bale, session_factory, user_id, chat_id, arg) -> N
         get_logger(__name__).exception("bill_command_failed", chat_id=chat_id)
         await bale.send_message(chat_id=chat_id, text="متأسفم، در پردازش قبض مشکلی پیش اومد. بعداً دوباره امتحان کن.")
         return
-    await _send_capture(bale, chat_id, res, user_id)
+    await _send_capture(bale, chat_id, res, user_id, session_factory)
 
 
 async def _reply_with_agent(bale, user, chat_id, text, session_factory) -> None:

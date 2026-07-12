@@ -40,10 +40,12 @@ async def _onboard(db_session, uid):
     await handle_bale_update(_text(uid, "/start", 1), session_factory=lambda: db_session)
     for i, ans in enumerate(["تهران", "آپارتمان", "2", "60-100", "پکیج", "اسپلیت", "کاهش قبض برق"], start=2):
         await handle_bale_update(_text(uid, ans, i), session_factory=lambda: db_session)
-    # Commit the motivations phase too, so onboarding is fully done and later
-    # messages in these tests reach the agent rather than re-showing the widget.
+    # Commit the motivations phase too, then skip the first-bill prompt, so
+    # onboarding is fully done and later messages in these tests reach the
+    # agent rather than re-showing a widget.
     await handle_bale_update(_cb(uid, "ms:motivations:reduce_bill", 20), session_factory=lambda: db_session)
     await handle_bale_update(_cb(uid, "ms:motivations:__done__", 21), session_factory=lambda: db_session)
+    await handle_bale_update(_cb(uid, "ob:bill:skip", 22), session_factory=lambda: db_session)
 
 
 def _wire(monkeypatch, bale, agent):

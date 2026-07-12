@@ -70,6 +70,7 @@ async def test_returning_user_start_shows_home_not_wizard(db_session, monkeypatc
     for i, ans in enumerate(["تهران", "آپارتمان", "2", "60-100", "پکیج", "اسپلیت", "کاهش قبض برق"], start=2):
         await handle_bale_update(_text(902, ans, i), session_factory=lambda: db_session)
     await _commit_motivations(db_session, 902, 20)
+    await handle_bale_update(_cb(902, "ob:bill:skip", 30), session_factory=lambda: db_session)
     bale.sent.clear()
     # Now /start again -> home screen with reply keyboard, no new wizard step.
     await handle_bale_update(_text(902, "/start", 99), session_factory=lambda: db_session)
@@ -100,6 +101,7 @@ async def test_wizard_completion_shows_home(db_session, monkeypatch):
     for i, ans in enumerate(answers, start=2):
         await handle_bale_update(_text(904, ans, i), session_factory=lambda: db_session)
     await _commit_motivations(db_session, 904, 20)
+    await handle_bale_update(_cb(904, "ob:bill:skip", 30), session_factory=lambda: db_session)
     from energybot.bale_adapter.home import HOME_TEXT
     assert bale.sent[-1]["text"] == HOME_TEXT
     assert bale.sent[-1]["reply_markup"]["keyboard"]
@@ -126,6 +128,7 @@ async def test_wizard_completion_via_callback_shows_home(db_session, monkeypatch
     for i, val in enumerate(cb_answers, start=3):
         await handle_bale_update(_cb(uid, val, update_id=i), session_factory=lambda: db_session)
     await _commit_motivations(db_session, 905, 20)
+    await handle_bale_update(_cb(905, "ob:bill:skip", 30), session_factory=lambda: db_session)
     from energybot.bale_adapter.home import HOME_TEXT
     assert bale.sent[-1]["text"] == HOME_TEXT
     assert bale.sent[-1]["reply_markup"]["keyboard"]

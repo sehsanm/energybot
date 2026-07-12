@@ -139,7 +139,7 @@ async def test_pay_callback_sends_pay_link(db_session, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_send_capture_spawns_suggestions(monkeypatch):
+async def test_send_capture_spawns_suggestions(db_session, monkeypatch):
     calls = []
     monkeypatch.setattr(h, "_spawn_suggestions",
                         lambda user_id, chat_id, bill_db_id: calls.append((user_id, chat_id, bill_db_id)))
@@ -152,7 +152,7 @@ async def test_send_capture_spawns_suggestions(monkeypatch):
     bid = uuid4()
     uid = uuid4()
     res = CaptureResult(ok=True, summary="خلاصه", pay_callback=f"pay:{bid}", bill_db_id=str(bid), error=None)
-    await h._send_capture(_Bale(), 777, res, uid)
+    await h._send_capture(_Bale(), 777, res, uid, lambda: db_session)
     assert calls == [(uid, 777, bid)]
 
 
@@ -175,7 +175,7 @@ async def test_on_suggestions_task_done_logs_and_discards_on_exception():
 
 
 @pytest.mark.asyncio
-async def test_send_capture_no_spawn_on_error(monkeypatch):
+async def test_send_capture_no_spawn_on_error(db_session, monkeypatch):
     calls = []
     monkeypatch.setattr(h, "_spawn_suggestions",
                         lambda user_id, chat_id, bill_db_id: calls.append(1))
@@ -186,5 +186,5 @@ async def test_send_capture_no_spawn_on_error(monkeypatch):
 
     from energybot.billing.service import CaptureResult
     res = CaptureResult(ok=False, summary="", pay_callback=None, bill_db_id=None, error="خطا")
-    await h._send_capture(_Bale(), 777, res, uuid4())
+    await h._send_capture(_Bale(), 777, res, uuid4(), lambda: db_session)
     assert calls == []
