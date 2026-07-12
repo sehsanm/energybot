@@ -1,4 +1,3 @@
-from collections.abc import Callable
 from datetime import datetime
 from uuid import UUID
 from sqlalchemy import select

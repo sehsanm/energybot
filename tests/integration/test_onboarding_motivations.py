@@ -65,3 +65,14 @@ async def test_motivations_commit_writes_profile(db_session, monkeypatch):
     u = (await db_session.execute(select(User).where(User.bale_user_id == 911))).scalar_one()
     p = (await db_session.execute(select(Profile).where(Profile.user_id == u.id))).scalar_one()
     assert p.behaviour.get("motivations") == ["reduce_bill"]
+
+
+@pytest.mark.asyncio
+async def test_motivations_resume_preserves_draft_selection(db_session, monkeypatch):
+    bale = FakeBale(); _wire(monkeypatch, bale)
+    await _do_profile(db_session, 912)
+    await handle_bale_update(_cb(912, "ms:motivations:reduce_bill", 20), session_factory=lambda: db_session)
+    await handle_bale_update(_text(912, "/start", 21), session_factory=lambda: db_session)
+    buttons = [b for row in bale.sent[-1]["reply_markup"]["inline_keyboard"] for b in row]
+    reduce_bill_btn = next(b for b in buttons if b["callback_data"] == "ms:motivations:reduce_bill")
+    assert reduce_bill_btn["text"].startswith("✅ ")

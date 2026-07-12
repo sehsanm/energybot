@@ -257,8 +257,9 @@ async def _send_home(bale: BaleClient, chat_id: int) -> None:
 
 async def _enter_motivations(bale, session_factory, user_id, chat_id) -> None:
     from energybot.bale_adapter.multiselect import build_markup
-    from energybot.onboarding import content
-    markup = build_markup("motivations", content.MOTIVATION_OPTIONS, [], allow_skip=False)
+    from energybot.onboarding import flow, content
+    selected = await flow.get_draft(session_factory, user_id, "motivations")
+    markup = build_markup("motivations", content.MOTIVATION_OPTIONS, selected, allow_skip=False)
     await bale.send_message(chat_id=chat_id, text=content.MOTIVATIONS_PROMPT, reply_markup=markup)
 
 
