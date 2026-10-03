@@ -64,7 +64,7 @@ export function SessionGate({ children }: { children: (user: GateUser) => React.
   if (state !== "ok" || !user) {
     return (
       <div className="flex min-h-dvh items-center justify-center">
-        <div className="animate-pulse text-[var(--muted)]">…در حال ورود</div>
+        <div className="animate-pulse text-[var(--muted-foreground)]">…در حال ورود</div>
       </div>
     );
   }

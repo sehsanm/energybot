@@ -92,21 +92,6 @@
   --sidebar-ring: oklch(0.696 0.15 163);
 }
 
-/* Legacy token aliases — pre-shadcn pages keep rendering until each is
-   retrofitted to the shadcn classes. Host theming sets the shadcn variables,
-   so both naming schemes stay in sync automatically. --accent intentionally
-   points at --primary (legacy pages used it as the brand accent); the retrofit
-   replaces these usages with shadcn's accent semantics. */
-:root,
-.dark {
-  --bg: var(--background);
-  --surface: var(--card);
-  --fg: var(--foreground);
-  --muted: var(--muted-foreground);
-  --accent: var(--primary);
-  --accent-fg: var(--primary-foreground);
-}
-
 html {
   font-family: Vazirmatn, "Segoe UI", Tahoma, "Iranian Sans", sans-serif;
 }

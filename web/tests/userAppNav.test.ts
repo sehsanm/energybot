@@ -92,4 +92,10 @@ describe("routing wiring (landing at /, dashboard at /home)", () => {
     expect(page).toContain('"/home"');
     expect(page).not.toMatch(/router\.replace\("\/"\)/);
   });
+
+  test("signed-in visitors get an entry back into the app from the landing", () => {
+    const page = readFileSync(join(root, "src/app/page.tsx"), "utf8");
+    expect(page).toContain("/api/me");
+    expect(page).toContain('"/home"');
+  });
 });

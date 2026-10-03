@@ -45,6 +45,14 @@ export function shouldCelebrate(event: CelebrateEvent): boolean {
   return event === "lesson_completed" || event === "bill_insights_ready";
 }
 
+/**
+ * Monotonic burst counter: every celebrated event advances it, so repeated
+ * completions (e.g. regenerating insights again) re-fire the confetti.
+ */
+export function nextBurst(prev: number, event: CelebrateEvent): number {
+  return shouldCelebrate(event) ? prev + 1 : prev;
+}
+
 export interface ConfettiPiece {
   leftPct: number;
   delayMs: number;

@@ -6,6 +6,7 @@ import {
   confettiPieces,
   CONFETTI_COLORS,
   shouldCelebrate,
+  nextBurst,
 } from "../src/components/kit/logic";
 
 describe("StreakFlame logic", () => {
@@ -61,5 +62,16 @@ describe("Confetti logic (hand-rolled, no dependency)", () => {
     expect(shouldCelebrate("lesson_completed")).toBe(true);
     expect(shouldCelebrate("bill_insights_ready")).toBe(true);
     expect(shouldCelebrate("chat_message")).toBe(false);
+  });
+
+  test("burst counter advances on every celebrated event (repeatable confetti)", () => {
+    let b = nextBurst(0, "bill_insights_ready");
+    expect(b).toBe(1);
+    b = nextBurst(b, "chat_message"); // ordinary traffic never bursts
+    expect(b).toBe(1);
+    b = nextBurst(b, "bill_insights_ready"); // regenerate celebrates again
+    expect(b).toBe(2);
+    b = nextBurst(b, "lesson_completed");
+    expect(b).toBe(3);
   });
 });

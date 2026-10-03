@@ -31,22 +31,22 @@ export default function AdminUsersPage() {
     <div className="mx-auto max-w-4xl space-y-4 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-black">کاربران</h1>
-        <Link href="/admin" className="text-sm font-bold text-[var(--accent)]">داشبورد</Link>
+        <Link href="/admin" className="text-sm font-bold text-[var(--primary)]">داشبورد</Link>
       </div>
       <input
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="جست‌وجو با نام یا نام کاربری…"
-        className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none focus:border-[var(--accent)]"
+        className="w-full rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-sm outline-none focus:border-[var(--primary)]"
       />
       {users === null ? (
-        <p className="text-sm text-[var(--muted)]">…در حال بارگذاری</p>
+        <p className="text-sm text-[var(--muted-foreground)]">…در حال بارگذاری</p>
       ) : users.length === 0 ? (
-        <p className="text-sm text-[var(--muted)]">کاربری پیدا نشد.</p>
+        <p className="text-sm text-[var(--muted-foreground)]">کاربری پیدا نشد.</p>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-[var(--border)]">
           <table className="w-full text-sm">
-            <thead className="bg-[var(--surface)] text-xs text-[var(--muted)]">
+            <thead className="bg-[var(--card)] text-xs text-[var(--muted-foreground)]">
               <tr>
                 <th className="p-3 text-right">نام</th>
                 <th className="p-3 text-right">کانال‌ها</th>
@@ -56,16 +56,16 @@ export default function AdminUsersPage() {
             </thead>
             <tbody>
               {users.map((u) => (
-                <tr key={u.id} className="border-t border-[var(--border)] bg-[var(--surface)]">
+                <tr key={u.id} className="border-t border-[var(--border)] bg-[var(--card)]">
                   <td className="p-3">
-                    <Link href={`/admin/users/${u.id}`} className="font-bold text-[var(--accent)]">
+                    <Link href={`/admin/users/${u.id}`} className="font-bold text-[var(--primary)]">
                       {u.displayName || u.usernames[0] || u.id.slice(0, 8)}
                     </Link>
                     {u.isBlocked && <span className="mr-2 text-xs text-[var(--warning)]">(مسدود)</span>}
                   </td>
                   <td className="p-3 text-xs">{u.channels.map((c) => (c === "bale" ? "بله" : "تلگرام")).join(" + ")}</td>
                   <td className="p-3">{u.billCount.toLocaleString("fa-IR")}</td>
-                  <td className="p-3 text-xs text-[var(--muted)]">
+                  <td className="p-3 text-xs text-[var(--muted-foreground)]">
                     {u.lastSeenAt ? new Date(u.lastSeenAt).toLocaleString("fa-IR") : "—"}
                   </td>
                 </tr>

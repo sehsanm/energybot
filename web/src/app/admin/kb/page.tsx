@@ -49,15 +49,15 @@ export default function AdminKbPage() {
     <div className="mx-auto max-w-4xl space-y-4 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-black">دانش‌نامه</h1>
-        <Link href="/admin" className="text-sm font-bold text-[var(--accent)]">داشبورد</Link>
+        <Link href="/admin" className="text-sm font-bold text-[var(--primary)]">داشبورد</Link>
       </div>
-      {status && <p className="text-xs text-[var(--muted)]">{status}</p>}
+      {status && <p className="text-xs text-[var(--muted-foreground)]">{status}</p>}
       {articles === null ? (
-        <p className="text-sm text-[var(--muted)]">…در حال بارگذاری</p>
+        <p className="text-sm text-[var(--muted-foreground)]">…در حال بارگذاری</p>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-[var(--border)]">
           <table className="w-full text-sm">
-            <thead className="bg-[var(--surface)] text-xs text-[var(--muted)]">
+            <thead className="bg-[var(--card)] text-xs text-[var(--muted-foreground)]">
               <tr>
                 <th className="p-3 text-right">عنوان</th>
                 <th className="p-3 text-right">دسته</th>
@@ -68,18 +68,18 @@ export default function AdminKbPage() {
             </thead>
             <tbody>
               {articles.map((a) => (
-                <tr key={a.id} className="border-t border-[var(--border)] bg-[var(--surface)]">
+                <tr key={a.id} className="border-t border-[var(--border)] bg-[var(--card)]">
                   <td className="p-3">
-                    <Link href={`/admin/kb/${a.id}`} className="font-bold text-[var(--accent)]">
+                    <Link href={`/admin/kb/${a.id}`} className="font-bold text-[var(--primary)]">
                       {a.title}
                     </Link>
-                    <div className="text-xs text-[var(--muted)]" dir="ltr">{a.slug}</div>
+                    <div className="text-xs text-[var(--muted-foreground)]" dir="ltr">{a.slug}</div>
                   </td>
                   <td className="p-3 text-xs">{a.category}</td>
                   <td className="p-3 text-xs">{a.chunkCount.toLocaleString("fa-IR")}</td>
                   <td className="p-3 text-xs">
                     {a.status === "published" ? "منتشرشده" : "پیش‌نویس"}
-                    <span className="mr-1 text-[var(--muted)]">({a.source === "seed" ? "بذری" : "ادمین"})</span>
+                    <span className="mr-1 text-[var(--muted-foreground)]">({a.source === "seed" ? "بذری" : "ادمین"})</span>
                   </td>
                   <td className="p-3">
                     <button

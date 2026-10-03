@@ -7,26 +7,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { confettiPieces } from "./logic";
 
-export function Confetti({
-  fire,
-  seed = 1,
-  count = 24,
-}: {
-  fire: boolean;
-  seed?: number;
-  count?: number;
-}) {
-  const pieces = useMemo(() => confettiPieces(seed, count), [seed, count]);
-  const [burst, setBurst] = useState(false);
+export function Confetti({ burst, count = 24 }: { burst: number; count?: number }) {
+  // One deterministic burst per increment — repeated completions re-fire.
+  const pieces = useMemo(() => confettiPieces(burst, count), [burst, count]);
+  const [live, setLive] = useState(false);
 
   useEffect(() => {
-    if (!fire) return;
-    setBurst(true);
-    const t = setTimeout(() => setBurst(false), 1800);
+    if (burst <= 0) return;
+    setLive(true);
+    const t = setTimeout(() => setLive(false), 1800);
     return () => clearTimeout(t);
-  }, [fire]);
+  }, [burst]);
 
-  if (!burst) return null;
+  if (!live) return null;
 
   return (
     <div aria-hidden className="pointer-events-none fixed inset-0 z-50 overflow-hidden">

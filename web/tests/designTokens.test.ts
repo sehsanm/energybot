@@ -1,10 +1,17 @@
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { describe, test, expect } from "vitest";
 
 const root = join(dirname(__filename), "..");
 const css = readFileSync(join(root, "src/app/globals.css"), "utf8");
 const layout = readFileSync(join(root, "src/app/layout.tsx"), "utf8");
+
+function walk(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+    const p = join(dir, e.name);
+    return e.isDirectory() ? walk(p) : /\.(tsx|ts)$/.test(e.name) ? [p] : [];
+  });
+}
 
 function block(selector: string): string {
   const start = css.indexOf(selector + " {");
@@ -69,6 +76,34 @@ describe("design tokens (Stitch pass)", () => {
 
   test("prefers-reduced-motion is honored globally", () => {
     expect(css).toMatch(/@media\s*\(prefers-reduced-motion:\s*reduce\)/);
+  });
+
+  test("no cascade collisions — tokens are declared exactly once per mode, never shadowed", () => {
+    // A later same-specificity block (the old legacy-alias block) silently
+    // overrode --muted/--accent, so the finalized tokens never reached the DOM.
+    const declared = (name: string) => (css.match(new RegExp(`--${name}:`, "g")) ?? []).length;
+    for (const token of ["muted", "accent", "primary", "secondary", "background", "card", "streak"]) {
+      expect(declared(token), `--${token} must be declared exactly twice (:root + .dark)`).toBe(2);
+    }
+    // The alias-only names must not exist at all anymore.
+    for (const legacy of ["bg:", "surface:", "fg:", "accent-fg:"]) {
+      expect(css).not.toContain(`--${legacy}`);
+    }
+  });
+});
+
+describe("legacy alias sweep (retrofit)", () => {
+  test("no component references legacy alias vars", () => {
+    // Old usages meant: --muted = muted TEXT (now --muted-foreground),
+    // --accent/--accent-fg = brand (now --primary/--primary-foreground),
+    // --surface/--bg/--fg = shells (now --card/--background/--foreground).
+    const offenders: string[] = [];
+    for (const file of walk(join(root, "src"))) {
+      if (file.includes("globals.css")) continue;
+      const text = readFileSync(file, "utf8");
+      if (/var\(--(muted|accent-fg|surface|bg|fg)\)/.test(text)) offenders.push(file);
+    }
+    expect(offenders, `files still using legacy alias vars: ${offenders.join(", ")}`).toEqual([]);
   });
 });
 

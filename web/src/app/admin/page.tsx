@@ -40,7 +40,7 @@ export default function AdminDashboard() {
   if (denied) {
     return (
       <div className="p-8 text-center text-sm">
-        دسترسی نداری. <Link href="/admin/login" className="font-bold text-[var(--accent)]">ورود مدیر</Link>
+        دسترسی نداری. <Link href="/admin/login" className="font-bold text-[var(--primary)]">ورود مدیر</Link>
       </div>
     );
   }
@@ -60,11 +60,11 @@ export default function AdminDashboard() {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-black">داشبورد مدیریت</h1>
         <div className="flex gap-3 text-sm">
-          <Link href="/admin/users" className="font-bold text-[var(--accent)]">کاربران</Link>
-          <Link href="/admin/kb" className="font-bold text-[var(--accent)]">دانش‌نامه</Link>
+          <Link href="/admin/users" className="font-bold text-[var(--primary)]">کاربران</Link>
+          <Link href="/admin/kb" className="font-bold text-[var(--primary)]">دانش‌نامه</Link>
           <button
             onClick={() => api("/api/auth/logout", { method: "POST" }).then(() => location.assign("/admin/login"))}
-            className="text-[var(--muted)]"
+            className="text-[var(--muted-foreground)]"
           >
             خروج
           </button>
@@ -73,15 +73,15 @@ export default function AdminDashboard() {
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         {cards.map((c) => (
-          <div key={c.label} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
+          <div key={c.label} className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
             <div className="text-2xl font-black">{c.value}</div>
-            <div className="mt-1 text-xs text-[var(--muted)]">{c.label}</div>
+            <div className="mt-1 text-xs text-[var(--muted-foreground)]">{c.label}</div>
           </div>
         ))}
       </div>
 
       {stats && stats.byChannel.length > 0 && (
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 text-sm">
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 text-sm">
           <span className="font-bold">کانال‌ها: </span>
           {stats.byChannel.map((c) => (
             <span key={c.channel} className="ml-3">
@@ -91,12 +91,12 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
         <h2 className="mb-2 font-bold">آخرین اقدام‌های مدیران</h2>
         {audit.length === 0 ? (
-          <p className="text-sm text-[var(--muted)]">چیزی ثبت نشده است.</p>
+          <p className="text-sm text-[var(--muted-foreground)]">چیزی ثبت نشده است.</p>
         ) : (
-          <ul className="space-y-1 text-xs text-[var(--muted)]">
+          <ul className="space-y-1 text-xs text-[var(--muted-foreground)]">
             {audit.slice(0, 10).map((a) => (
               <li key={a.id}>
                 {new Date(a.createdAt).toLocaleString("fa-IR")} — {a.action} ({a.entityType})

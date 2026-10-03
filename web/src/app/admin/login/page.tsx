@@ -27,7 +27,7 @@ export default function AdminLoginPage() {
 
   return (
     <div className="flex min-h-dvh items-center justify-center px-4">
-      <form onSubmit={submit} className="w-full max-w-sm space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6">
+      <form onSubmit={submit} className="w-full max-w-sm space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6">
         <h1 className="text-lg font-black">پنل مدیریت دستیار انرژی</h1>
         <label className="block">
           <span className="mb-1 block text-sm font-bold">ایمیل</span>
@@ -36,7 +36,7 @@ export default function AdminLoginPage() {
             dir="ltr"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2.5 text-sm outline-none focus:border-[var(--accent)]"
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm outline-none focus:border-[var(--primary)]"
             required
           />
         </label>
@@ -47,7 +47,7 @@ export default function AdminLoginPage() {
             dir="ltr"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2.5 text-sm outline-none focus:border-[var(--accent)]"
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm outline-none focus:border-[var(--primary)]"
             required
           />
         </label>
@@ -55,7 +55,7 @@ export default function AdminLoginPage() {
         <button
           type="submit"
           disabled={busy}
-          className="w-full rounded-xl bg-[var(--accent)] px-4 py-3 font-bold text-[var(--accent-fg)] disabled:opacity-50"
+          className="w-full rounded-xl bg-[var(--primary)] px-4 py-3 font-bold text-[var(--primary-foreground)] disabled:opacity-50"
         >
           ورود
         </button>

@@ -88,7 +88,7 @@ export default function AdminUserDetail() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-xl font-black">{d.user.displayName || d.identities[0]?.username || d.user.id.slice(0, 8)}</h1>
-          <p className="text-xs text-[var(--muted)]">
+          <p className="text-xs text-[var(--muted-foreground)]">
             {d.identities.map((i) => `${i.channel === "bale" ? "بله" : "تلگرام"} (${i.externalId})`).join(" + ")}
           </p>
         </div>
@@ -96,30 +96,30 @@ export default function AdminUserDetail() {
           onClick={toggleBlock}
           disabled={busy}
           className={`rounded-xl px-4 py-2 text-sm font-bold ${
-            d.user.isBlocked ? "bg-[var(--accent)] text-[var(--accent-fg)]" : "border border-[var(--warning)] text-[var(--warning)]"
+            d.user.isBlocked ? "bg-[var(--primary)] text-[var(--primary-foreground)]" : "border border-[var(--warning)] text-[var(--warning)]"
           }`}
         >
           {d.user.isBlocked ? "رفع مسدودی" : "مسدودسازی"}
         </button>
       </div>
 
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
         <h2 className="mb-2 text-sm font-bold">ارسال پیام دستی (ناج)</h2>
         <textarea
           value={msg}
           onChange={(e) => setMsg(e.target.value)}
           rows={2}
           placeholder="متن پیام…"
-          className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] p-3 text-sm outline-none focus:border-[var(--accent)]"
+          className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] p-3 text-sm outline-none focus:border-[var(--primary)]"
         />
         <button
           onClick={send}
           disabled={busy}
-          className="mt-2 rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-bold text-[var(--accent-fg)] disabled:opacity-50"
+          className="mt-2 rounded-xl bg-[var(--primary)] px-4 py-2 text-sm font-bold text-[var(--primary-foreground)] disabled:opacity-50"
         >
           ارسال به کانال کاربر
         </button>
-        {status && <p className="mt-2 text-xs text-[var(--muted)]">{status}</p>}
+        {status && <p className="mt-2 text-xs text-[var(--muted-foreground)]">{status}</p>}
       </div>
 
       <div className="flex gap-2">
@@ -128,7 +128,7 @@ export default function AdminUserDetail() {
             key={t}
             onClick={() => setTab(t)}
             className={`rounded-full px-4 py-1.5 text-sm font-bold ${
-              tab === t ? "bg-[var(--accent)] text-[var(--accent-fg)]" : "bg-[var(--surface)] text-[var(--muted)]"
+              tab === t ? "bg-[var(--primary)] text-[var(--primary-foreground)]" : "bg-[var(--card)] text-[var(--muted-foreground)]"
             }`}
           >
             {t === "bills" ? `قبض‌ها (${d.bills.length.toLocaleString("fa-IR")})` : t === "messages" ? "تعامل‌ها" : "پروفایل"}
@@ -138,9 +138,9 @@ export default function AdminUserDetail() {
 
       {tab === "bills" && (
         <div className="space-y-3">
-          {d.bills.length === 0 && <p className="text-sm text-[var(--muted)]">قبضی ثبت نشده.</p>}
+          {d.bills.length === 0 && <p className="text-sm text-[var(--muted-foreground)]">قبضی ثبت نشده.</p>}
           {d.bills.map((b) => (
-            <div key={b.id} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 text-sm">
+            <div key={b.id} className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 text-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-bold">
                   {b.utilityType} · دوره {b.term ?? "—"} · {(b.amount / 10).toLocaleString("fa-IR")} تومان
@@ -156,14 +156,14 @@ export default function AdminUserDetail() {
                   <button
                     onClick={() => regenInsights(b.id, true)}
                     disabled={busy}
-                    className="rounded-lg bg-[var(--accent)] px-3 py-1 text-xs font-bold text-[var(--accent-fg)]"
+                    className="rounded-lg bg-[var(--primary)] px-3 py-1 text-xs font-bold text-[var(--primary-foreground)]"
                   >
                     تولید و ارسال
                   </button>
                 </span>
               </div>
               {b.suggestions && (
-                <p className="mt-2 text-xs leading-6 text-[var(--muted)]">
+                <p className="mt-2 text-xs leading-6 text-[var(--muted-foreground)]">
                   {b.suggestions.intro} — {b.suggestions.tips.length} نکته
                 </p>
               )}
@@ -178,22 +178,22 @@ export default function AdminUserDetail() {
             <div
               key={m.id}
               className={`rounded-xl border p-3 text-sm ${
-                m.role === "user" ? "border-[var(--border)] bg-[var(--surface)]" : "bg-[var(--bg)]"
+                m.role === "user" ? "border-[var(--border)] bg-[var(--card)]" : "bg-[var(--background)]"
               }`}
             >
-              <div className="mb-1 text-xs text-[var(--muted)]">
+              <div className="mb-1 text-xs text-[var(--muted-foreground)]">
                 {m.role === "user" ? "کاربر" : m.role === "admin" ? "مدیر" : "ربات"} · {m.channel} ·{" "}
                 {new Date(m.createdAt).toLocaleString("fa-IR")}
               </div>
               {m.content}
             </div>
           ))}
-          {d.messages.length === 0 && <p className="text-sm text-[var(--muted)]">تعاملی ثبت نشده.</p>}
+          {d.messages.length === 0 && <p className="text-sm text-[var(--muted-foreground)]">تعاملی ثبت نشده.</p>}
         </div>
       )}
 
       {tab === "profile" && (
-        <pre className="overflow-x-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 text-xs leading-6" dir="ltr">
+        <pre className="overflow-x-auto rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 text-xs leading-6" dir="ltr">
           {JSON.stringify({ household: d.profile?.household, behaviour: d.profile?.behaviour, goals: d.profile?.goals }, null, 2)}
         </pre>
       )}

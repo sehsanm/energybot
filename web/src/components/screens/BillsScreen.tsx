@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { toFaDigits } from "@/components/kit/logic";
+import { toFaDigits, nextBurst } from "@/components/kit/logic";
 import { api } from "@/lib/client/api";
 
 interface Target {
@@ -86,7 +86,7 @@ export default function BillsScreen() {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [celebrate, setCelebrate] = useState(false);
+  const [burst, setBurst] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = () => api<{ bills: BillJson[] }>("/api/bills").then((d) => setBills(d.bills)).catch(() => setBills([]));
@@ -129,7 +129,7 @@ export default function BillsScreen() {
     try {
       await api(`/api/bills/${id}/insights`, { method: "POST" });
       await load();
-      setCelebrate(true); // insights_ready — a completion moment
+      setBurst((b) => nextBurst(b, "bill_insights_ready"));
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -139,7 +139,7 @@ export default function BillsScreen() {
 
   return (
     <AppShell>
-      <Confetti fire={celebrate} seed={7} />
+      <Confetti burst={burst} />
       <ScreenHeader title="قبض‌های من" subtitle="استعلام، تحلیل و پیشنهاد صرفه‌جویی" />
       <div className="space-y-4">
         {/* Upload */}

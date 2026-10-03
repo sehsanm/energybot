@@ -1,16 +1,25 @@
 "use client";
 
 // Public landing (anonymous): value proposition, how-it-works, CTAs into the
-// bots. Full Stitch retrofit lands with the redesign pass — this is the
-// structural page so / is public and gated pages redirect here.
+// bots. Signed-in visitors get a direct way back into the app (/home) so an
+// old bookmark never dead-ends them on the marketing page.
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { copy } from "@/content/copy";
+import { api } from "@/lib/client/api";
 
 const baleUrl = process.env.NEXT_PUBLIC_BALE_BOT_URL || "/login";
 const telegramUrl = process.env.NEXT_PUBLIC_TELEGRAM_BOT_URL || "/login";
 
 export default function LandingPage() {
+  const [signedIn, setSignedIn] = useState(false);
+  useEffect(() => {
+    api("/api/me")
+      .then(() => setSignedIn(true))
+      .catch(() => {});
+  }, []);
+
   return (
     <div data-page="landing" className="mx-auto flex min-h-dvh w-full max-w-lg flex-col px-6 py-10">
       <main className="flex flex-1 flex-col justify-center gap-8 text-center">
@@ -52,6 +61,14 @@ export default function LandingPage() {
           >
             {copy.landing.ctaTelegram}
           </a>
+          {signedIn && (
+            <Link
+              href="/home"
+              className="block w-full rounded-full bg-[var(--secondary)] px-4 py-3 font-black text-[var(--secondary-foreground)]"
+            >
+              ورود به اپ ←
+            </Link>
+          )}
           <Link href="/login" className="block pt-1 text-xs text-[var(--muted-foreground)] underline">
             {copy.landing.webLogin}
           </Link>
