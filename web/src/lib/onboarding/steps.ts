@@ -135,3 +135,54 @@ export function nextIncompleteStep(draft: OnboardingDraft): OnboardingStepKey {
   }
   return "toolbox";
 }
+
+/**
+ * The PUT /api/profile body a step commits when its «ادامه» is tapped — only
+ * that step's own fields, so partial saves never clobber siblings. null means
+ * the step saves nothing per-tap (welcome, first_bill; toolbox saves on تأیید).
+ */
+export function stepBody(
+  key: OnboardingStepKey,
+  draft: OnboardingDraft,
+): Record<string, unknown> | null {
+  switch (key) {
+    case "home":
+      return { city: draft.city?.trim(), home_type: draft.home_type };
+    case "occupants":
+      return { occupants: draft.occupants, area_m2: draft.area_m2 };
+    case "systems":
+      return {
+        heating_type: draft.heating_type,
+        cooling_type: draft.cooling_type,
+        main_concern: draft.main_concern,
+      };
+    case "motivations":
+      return { behaviour: { motivations: draft.motivations ?? [] } };
+    default:
+      return null;
+  }
+}
+
+/**
+ * Merge step bodies (oldest first) into one PUT body: top-level keys override
+ * in order and `behaviour` merges per-key. The wizard queues bodies whose save
+ * failed and re-sends them merged with the next attempt, so a transient
+ * failure can never silently drop fields on the way to completion.
+ */
+export function mergeStepBodies(
+  bodies: readonly Record<string, unknown>[],
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  const behaviour: Record<string, unknown> = {};
+  for (const body of bodies) {
+    for (const [key, value] of Object.entries(body)) {
+      if (key === "behaviour" && value !== null && typeof value === "object" && !Array.isArray(value)) {
+        Object.assign(behaviour, value as Record<string, unknown>);
+      } else {
+        out[key] = value;
+      }
+    }
+  }
+  if (Object.keys(behaviour).length > 0) out.behaviour = behaviour;
+  return out;
+}

@@ -10,8 +10,12 @@
 //
 // Resume derives from the profile alone (nextIncompleteStep); no wizard state
 // is ever written under behaviour.onboarding.*.
+//
+// Saves are resilient: a failed PUT is queued and re-sent (merged) with the
+// next save or with «تأیید», which never completes onboarding while unsaved
+// fields remain — a transient failure can't silently drop data.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { Confetti } from "@/components/kit/Confetti";
@@ -24,7 +28,9 @@ import {
   ONBOARDING_STEPS,
   draftFromProfile,
   isStepValid,
+  mergeStepBodies,
   nextIncompleteStep,
+  stepBody,
   type OnboardingDraft,
   type OnboardingStepKey,
   type ProfileLike,
@@ -41,27 +47,6 @@ export interface StepProps {
   draft: OnboardingDraft;
   setDraft: React.Dispatch<React.SetStateAction<OnboardingDraft>>;
   valid: boolean;
-}
-
-/** Body each step commits (fire-and-forget) via PUT /api/profile on «ادامه». */
-function stepBody(key: OnboardingStepKey, draft: OnboardingDraft): Record<string, unknown> | null {
-  switch (key) {
-    case "home":
-      return { city: draft.city?.trim(), home_type: draft.home_type };
-    case "occupants":
-      return { occupants: draft.occupants, area_m2: draft.area_m2 };
-    case "systems":
-      return {
-        heating_type: draft.heating_type,
-        cooling_type: draft.cooling_type,
-        main_concern: draft.main_concern,
-      };
-    case "motivations":
-      return { behaviour: { motivations: draft.motivations ?? [] } };
-    default:
-      // welcome (nothing to save), first_bill (Task 7), toolbox (saved on تأیید)
-      return null;
-  }
 }
 
 /**
@@ -106,6 +91,10 @@ export function WelcomeWizard({ profile }: { profile: ProfileLike }) {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [burst, setBurst] = useState(0);
+  // Bodies of saves that have not been confirmed by the server yet. A ref (not
+  // state) because nothing renders from it and mutations must be synchronous,
+  // so rapid taps can never race a save into being dropped.
+  const unsentRef = useRef<Record<string, unknown>[]>([]);
 
   const total = ONBOARDING_STEPS.length;
   const step = ONBOARDING_STEPS[Math.min(stepIndex, total - 1)];
@@ -126,15 +115,32 @@ export function WelcomeWizard({ profile }: { profile: ProfileLike }) {
   // the first reachable step (nothing further to go back to).
   useBackButton(goBack, { visible: backStack.length > 0 });
 
+  /**
+   * Queue `extra` (if any) and PUT every unsent body as one merged save.
+   * On success exactly the bodies this call sent leave the queue; on failure
+   * everything stays queued so the next attempt re-sends all of it.
+   */
+  async function flush(extra: Record<string, unknown> | null): Promise<boolean> {
+    if (extra) unsentRef.current.push(extra);
+    const sending = [...unsentRef.current];
+    if (sending.length === 0) return true;
+    try {
+      await api("/api/profile", { method: "PUT", body: mergeStepBodies(sending) });
+      unsentRef.current = unsentRef.current.filter((b) => !sending.includes(b));
+      return true;
+    } catch {
+      return false; // queue untouched — retried by the next save / «تأیید»
+    }
+  }
+
   function goNext() {
     if (!valid || done) return;
     setError(null);
-    const body = stepBody(step.key, draft);
-    if (body) {
-      // Fire-and-forget: the wizard advances immediately; a failed save
-      // surfaces the error line (the step is re-saved on the next «ادامه»).
-      api("/api/profile", { method: "PUT", body }).catch(() => setError(w.saveError));
-    }
+    // Fire-and-forget: the wizard advances immediately; a failed save surfaces
+    // the error line and stays queued for the next «ادامه» / «تأیید».
+    void flush(stepBody(step.key, draft)).then((ok) => {
+      if (!ok) setError(w.saveError);
+    });
     setBackStack((s) => [...s, stepIndex]);
     setStepIndex((i) => Math.min(i + 1, total - 1));
   }
@@ -143,13 +149,14 @@ export function WelcomeWizard({ profile }: { profile: ProfileLike }) {
     if (busy || done || !valid) return;
     setBusy(true);
     setError(null);
+    // Completion never runs while fields are unsaved: flush the queue together
+    // with the toolbox prefs and abort on failure (the retry re-sends both).
+    if (!(await flush({ behaviour: { service_prefs: draft.service_prefs ?? [] } }))) {
+      setError(w.completeError);
+      setBusy(false);
+      return;
+    }
     try {
-      // Toolbox prefs are best-effort — completion is the gate that matters,
-      // and the profile screen can re-save prefs later.
-      await api("/api/profile", {
-        method: "PUT",
-        body: { behaviour: { service_prefs: draft.service_prefs ?? [] } },
-      }).catch(() => {});
       await api("/api/onboarding/complete", { method: "POST" });
       setDone(true);
       setBurst(1);
