@@ -3,11 +3,13 @@
 // Session gate for user pages: ensures a session exists before rendering.
 // 1. Try GET /api/me.
 // 2. On 401 inside a mini app host → exchange initData at /api/auth/miniapp.
-// 3. Still unauthed → friendly Persian fallback with web-login hint.
+// 3. Still unauthed → redirect to the public landing (ANON_REDIRECT), whose
+//    CTAs route the visitor into the bots to get a fresh session.
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMiniApp } from "@/lib/miniapp/useMiniApp";
+import { ANON_REDIRECT } from "@/lib/nav/userNav";
 import { api } from "@/lib/client/api";
 
 export interface GateUser {
@@ -17,6 +19,7 @@ export interface GateUser {
 
 export function SessionGate({ children }: { children: (user: GateUser) => React.ReactNode }) {
   const { host, webApp, ready } = useMiniApp();
+  const router = useRouter();
   const [state, setState] = useState<"loading" | "ok" | "anon">("loading");
   const [user, setUser] = useState<GateUser | null>(null);
 
@@ -54,7 +57,11 @@ export function SessionGate({ children }: { children: (user: GateUser) => React.
     };
   }, [ready, host, webApp]);
 
-  if (state === "loading") {
+  useEffect(() => {
+    if (state === "anon") router.replace(ANON_REDIRECT);
+  }, [state, router]);
+
+  if (state !== "ok" || !user) {
     return (
       <div className="flex min-h-dvh items-center justify-center">
         <div className="animate-pulse text-[var(--muted)]">…در حال ورود</div>
@@ -62,21 +69,5 @@ export function SessionGate({ children }: { children: (user: GateUser) => React.
     );
   }
 
-  if (state === "anon") {
-    return (
-      <div className="mx-auto flex min-h-dvh max-w-lg flex-col items-center justify-center gap-4 px-6 text-center">
-        <div className="text-4xl">💡</div>
-        <h1 className="text-xl font-bold">دستیار انرژی</h1>
-        <p className="text-sm leading-7 text-[var(--muted)]">
-          این بخش داخل بله یا تلگرام باز می‌شود. از داخل ربات روی دکمهٔ «باز کردن اپ» بزن،
-          یا از ربات دستور /web را بفرست تا لینک ورود بگیری.
-        </p>
-        <Link href="/" className="text-sm font-bold text-[var(--accent)]">
-          بازگشت به صفحهٔ اصلی
-        </Link>
-      </div>
-    );
-  }
-
-  return <>{user ? children(user) : null}</>;
+  return <>{children(user)}</>;
 }

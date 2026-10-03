@@ -1,100 +1,62 @@
 "use client";
 
-// Dashboard: latest bill headline + insights preview + quick links.
+// Public landing (anonymous): value proposition, how-it-works, CTAs into the
+// bots. Full Stitch retrofit lands with the redesign pass — this is the
+// structural page so / is public and gated pages redirect here.
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { AppShell, Card, PrimaryButton } from "@/components/AppShell";
-import { SessionGate } from "@/components/SessionGate";
-import { api } from "@/lib/client/api";
+import { copy } from "@/content/copy";
 
-interface BillJson {
-  id: string;
-  utilityLabel: string;
-  amountLabel: string;
-  term: string | null;
-  consumption: number | null;
-  suggestions: { intro: string; tips: string[] } | null;
-  createdAt: number;
-}
+const baleUrl = process.env.NEXT_PUBLIC_BALE_BOT_URL || "/login";
+const telegramUrl = process.env.NEXT_PUBLIC_TELEGRAM_BOT_URL || "/login";
 
-function Dashboard() {
-  const [bills, setBills] = useState<BillJson[] | null>(null);
-  useEffect(() => {
-    api<{ bills: BillJson[] }>("/api/bills")
-      .then((d) => setBills(d.bills))
-      .catch(() => setBills([]));
-  }, []);
-  const latest = bills?.[0];
-
+export default function LandingPage() {
   return (
-    <AppShell>
-      <div className="space-y-4">
-        <div>
-          <h1 className="text-2xl font-black">دستیار انرژی</h1>
-          <p className="mt-1 text-sm text-[var(--muted)]">قبضت را بفرست، تحلیل و پیشنهاد صرفه‌جویی بگیر</p>
+    <div data-page="landing" className="mx-auto flex min-h-dvh w-full max-w-lg flex-col px-6 py-10">
+      <main className="flex flex-1 flex-col justify-center gap-8 text-center">
+        <div className="space-y-3">
+          <div className="text-5xl">💡</div>
+          <h1 className="text-3xl font-black leading-tight">{copy.landing.hero}</h1>
+          <p className="text-sm leading-7 text-[var(--muted)]">{copy.landing.sub}</p>
         </div>
 
-        {bills === null ? (
-          <Card>…در حال بارگذاری</Card>
-        ) : latest ? (
-          <>
-            <Card>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-[var(--muted)]">آخرین قبض · {latest.utilityLabel}</span>
-                {latest.term && <span className="text-xs text-[var(--muted)]">دوره {latest.term}</span>}
-              </div>
-              <div className="mt-2 text-2xl font-black">{latest.amountLabel}</div>
-              {latest.consumption != null && (
-                <div className="mt-1 text-sm text-[var(--muted)]">
-                  مصرف دوره: {latest.consumption.toLocaleString("fa-IR")} کیلووات‌ساعت
-                </div>
-              )}
-            </Card>
-            <Card>
-              <h2 className="mb-2 font-bold">💡 پیشنهادها</h2>
-              {latest.suggestions ? (
-                <div className="space-y-2 text-sm leading-6">
-                  <p>{latest.suggestions.intro}</p>
-                  <ul className="list-inside list-disc space-y-1">
-                    {latest.suggestions.tips.map((t, i) => (
-                      <li key={i}>{t}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : (
-                <p className="text-sm text-[var(--muted)]">برای این قبض هنوز پیشنهادی ثبت نشده.</p>
-              )}
-            </Card>
-          </>
-        ) : (
-          <Card className="space-y-3 text-center">
-            <div className="text-4xl">📄</div>
-            <p className="text-sm leading-7 text-[var(--muted)]">
-              هنوز قبضی ثبت نکرده‌ای. عکس قبض برق یا گاز را بفرست تا استعلام و تحلیلش کنم.
-            </p>
-            <Link href="/bills">
-              <PrimaryButton>ثبت اولین قبض</PrimaryButton>
-            </Link>
-          </Card>
-        )}
+        <ol className="space-y-3">
+          {copy.landing.steps.map((s, i) => (
+            <li
+              key={i}
+              className="flex items-start gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 text-right"
+            >
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--secondary)] text-sm font-black">
+                {(i + 1).toLocaleString("fa-IR")}
+              </span>
+              <span>
+                <span className="block font-bold">{s.title}</span>
+                <span className="mt-1 block text-xs leading-6 text-[var(--muted)]">{s.desc}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
 
-        <div className="grid grid-cols-2 gap-3">
-          <Link href="/bills" className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 text-center text-sm font-bold">
-            📄 قبض‌های من
-          </Link>
-          <Link href="/profile" className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 text-center text-sm font-bold">
-            👤 پروفایل
+        <div className="space-y-3">
+          <a
+            href={baleUrl}
+            className="block w-full rounded-full bg-[var(--accent)] px-4 py-3.5 font-bold text-[var(--accent-fg)]"
+          >
+            {copy.landing.ctaBale}
+          </a>
+          <a
+            href={telegramUrl}
+            className="block w-full rounded-full border border-[var(--border)] bg-[var(--surface)] px-4 py-3.5 font-bold"
+          >
+            {copy.landing.ctaTelegram}
+          </a>
+          <Link href="/login" className="block pt-1 text-xs text-[var(--muted)] underline">
+            {copy.landing.webLogin}
           </Link>
         </div>
-        <p className="pt-2 text-center text-xs text-[var(--muted)]">
-          گفتگوی هوشمند و درس‌های کوتاه صرفه‌جویی به‌زودی می‌آید 🚀
-        </p>
-      </div>
-    </AppShell>
+      </main>
+
+      <footer className="pt-6 text-center text-xs text-[var(--muted)]">{copy.landing.footer}</footer>
+    </div>
   );
-}
-
-export default function Home() {
-  return <SessionGate>{() => <Dashboard />}</SessionGate>;
 }

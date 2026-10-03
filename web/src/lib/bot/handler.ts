@@ -65,7 +65,8 @@ async function sendUtilityPrompt(client: BotClient, chatId: string): Promise<voi
 
 function miniAppUrl(): string | null {
   const base = env.publicBaseUrl();
-  return base ? `${base.replace(/\/$/, "")}/` : null;
+  // /home is the gated app entry; / is the public landing now.
+  return base ? `${base.replace(/\/$/, "")}/home` : null;
 }
 
 function appKeyboard(): { inline: { text: string; webAppUrl: string }[][] } | undefined {

@@ -2,10 +2,16 @@ import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import "./globals.css";
 import { MiniAppProvider } from "@/lib/miniapp/useMiniApp";
-import { Geist } from "next/font/google";
+import localFont from "next/font/local";
 import { cn } from "@/lib/utils";
 
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
+// Vazirmatn variable font, bundled locally (no CDN dependency at runtime).
+const vazirmatn = localFont({
+  src: "../fonts/Vazirmatn-var.woff2",
+  variable: "--font-vazirmatn",
+  display: "swap",
+  weight: "100 900",
+});
 
 export const metadata: Metadata = {
   title: "دستیار انرژی",
@@ -20,7 +26,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fa" dir="rtl" className={cn("font-sans", geist.variable)}>
+    <html lang="fa" dir="rtl" className={cn("font-sans", vazirmatn.variable)}>
       <body className="min-h-dvh antialiased">
         {/* Mini-app host bridges: the page must load these itself — hosts do not
             inject them. Telegram defines window.Telegram.WebApp, Bale window.Bale.WebApp.
