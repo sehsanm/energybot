@@ -1,9 +1,13 @@
 "use client";
 
-// Admin dashboard: headline numbers + channel split + audit tail.
+// Admin dashboard (dashboard-mock language): stat cards + channel split + audit tail.
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Users, Activity, Receipt, Lightbulb, MessageSquare } from "lucide-react";
+import { AdminShell } from "@/components/admin/AdminShell";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/client/api";
 
 interface Stats {
@@ -40,71 +44,105 @@ export default function AdminDashboard() {
   if (denied) {
     return (
       <div className="p-8 text-center text-sm">
-        دسترسی نداری. <Link href="/admin/login" className="font-bold text-[var(--primary)]">ورود مدیر</Link>
+        دسترسی نداری.{" "}
+        <Link href="/admin/login" className="font-bold text-[var(--primary)]">
+          ورود مدیر
+        </Link>
       </div>
     );
   }
 
-  const cards: { label: string; value: string }[] = stats
+  const cards: { label: string; value: string; icon: React.ComponentType<{ className?: string }> }[] = stats
     ? [
-        { label: "کاربران", value: fa(stats.usersTotal) },
-        { label: "فعال (۲۴س)", value: fa(stats.usersActive) },
-        { label: "قبض‌ها", value: fa(stats.billsTotal) },
-        { label: "پیشنهادهای تولیدشده", value: fa(stats.insightsCount) },
-        { label: "پیام‌ها (۷روز)", value: fa(stats.messages7d) },
+        { label: "کل کاربران", value: fa(stats.usersTotal), icon: Users },
+        { label: "فعال (۲۴ ساعت)", value: fa(stats.usersActive), icon: Activity },
+        { label: "قبض‌های ثبت‌شده", value: fa(stats.billsTotal), icon: Receipt },
+        { label: "پیشنهادهای تولیدشده", value: fa(stats.insightsCount), icon: Lightbulb },
+        { label: "پیام‌ها (۷ روز)", value: fa(stats.messages7d), icon: MessageSquare },
       ]
     : [];
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-black">داشبورد مدیریت</h1>
-        <div className="flex gap-3 text-sm">
-          <Link href="/admin/users" className="font-bold text-[var(--primary)]">کاربران</Link>
-          <Link href="/admin/kb" className="font-bold text-[var(--primary)]">دانش‌نامه</Link>
-          <button
-            onClick={() => api("/api/auth/logout", { method: "POST" }).then(() => location.assign("/admin/login"))}
-            className="text-[var(--muted-foreground)]"
-          >
-            خروج
-          </button>
+    <AdminShell title="داشبورد مدیریت">
+      <div className="mx-auto max-w-5xl space-y-6">
+        {/* Stat cards */}
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+          {cards.length === 0
+            ? Array.from({ length: 5 }).map((_, i) => (
+                <Card key={i}>
+                  <CardContent className="px-4 py-5">
+                    <div className="h-7 w-16 animate-pulse rounded bg-[var(--secondary)]" />
+                    <div className="mt-2 h-3 w-24 animate-pulse rounded bg-[var(--secondary)]" />
+                  </CardContent>
+                </Card>
+              ))
+            : cards.map((c) => (
+                <Card key={c.label}>
+                  <CardContent className="flex items-center gap-3 px-4 py-4">
+                    <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-[var(--secondary)] text-[var(--primary)]">
+                      <c.icon className="size-5" aria-hidden />
+                    </span>
+                    <div className="min-w-0">
+                      <div className="text-xl font-black" dir="ltr">
+                        {c.value}
+                      </div>
+                      <div className="truncate text-[11px] text-[var(--muted-foreground)]">{c.label}</div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
         </div>
-      </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        {cards.map((c) => (
-          <div key={c.label} className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
-            <div className="text-2xl font-black">{c.value}</div>
-            <div className="mt-1 text-xs text-[var(--muted-foreground)]">{c.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {stats && stats.byChannel.length > 0 && (
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 text-sm">
-          <span className="font-bold">کانال‌ها: </span>
-          {stats.byChannel.map((c) => (
-            <span key={c.channel} className="ml-3">
-              {c.channel === "bale" ? "بله" : "تلگرام"}: {fa(Number(c.n))}
-            </span>
-          ))}
-        </div>
-      )}
-
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
-        <h2 className="mb-2 font-bold">آخرین اقدام‌های مدیران</h2>
-        {audit.length === 0 ? (
-          <p className="text-sm text-[var(--muted-foreground)]">چیزی ثبت نشده است.</p>
-        ) : (
-          <ul className="space-y-1 text-xs text-[var(--muted-foreground)]">
-            {audit.slice(0, 10).map((a) => (
-              <li key={a.id}>
-                {new Date(a.createdAt).toLocaleString("fa-IR")} — {a.action} ({a.entityType})
-              </li>
-            ))}
-          </ul>
+        {/* Channel split */}
+        {stats && stats.byChannel.length > 0 && (
+          <Card>
+            <CardContent className="flex flex-wrap items-center gap-3 px-4 py-4 text-sm">
+              <span className="font-bold">تقسیم کانال‌ها:</span>
+              {stats.byChannel.map((c) => (
+                <Badge key={c.channel} variant="secondary" className="gap-1 rounded-md">
+                  {c.channel === "bale" ? "بله" : "تلگرام"}
+                  <span dir="ltr">{fa(Number(c.n))}</span>
+                </Badge>
+              ))}
+            </CardContent>
+          </Card>
         )}
+
+        {/* Audit tail */}
+        <Card>
+          <CardContent className="px-4 py-4">
+            <h2 className="mb-3 text-sm font-black">آخرین اقدام‌های مدیران</h2>
+            {audit.length === 0 ? (
+              <p className="text-sm text-[var(--muted-foreground)]">چیزی ثبت نشده است.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="text-[var(--muted-foreground)]">
+                    <tr className="border-b border-[var(--border)]">
+                      <th className="px-2 py-2 text-right font-bold">زمان</th>
+                      <th className="px-2 py-2 text-right font-bold">اقدام</th>
+                      <th className="px-2 py-2 text-right font-bold">موجودیت</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {audit.slice(0, 10).map((a) => (
+                      <tr key={a.id} className="border-b border-[var(--border)]/50 last:border-0">
+                        <td className="whitespace-nowrap px-2 py-2 text-[var(--muted-foreground)]" dir="ltr">
+                          {new Date(a.createdAt).toLocaleString("fa-IR")}
+                        </td>
+                        <td className="px-2 py-2 font-bold">{a.action}</td>
+                        <td className="px-2 py-2 text-[var(--muted-foreground)]">
+                          {a.entityType} <span dir="ltr">{a.entityId.slice(0, 8)}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
-    </div>
+    </AdminShell>
   );
 }

@@ -1,9 +1,21 @@
 "use client";
 
-// Admin KB: article list + inline edit + publish toggle.
+// Admin KB: article list + publish toggle (dashboard-mock language).
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { AdminShell } from "@/components/admin/AdminShell";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { api } from "@/lib/client/api";
 
 interface Article {
@@ -46,56 +58,74 @@ export default function AdminKbPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4 p-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-black">دانش‌نامه</h1>
-        <Link href="/admin" className="text-sm font-bold text-[var(--primary)]">داشبورد</Link>
+    <AdminShell title="دانش‌نامه">
+      <div className="mx-auto max-w-5xl space-y-4">
+        {status && <p className="text-xs text-[var(--muted-foreground)]">{status}</p>}
+        {articles === null ? (
+          <p className="p-4 text-sm text-[var(--muted-foreground)]">…در حال بارگذاری</p>
+        ) : (
+          <Card className="overflow-hidden py-0">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="text-right">عنوان</TableHead>
+                  <TableHead className="text-right">دسته</TableHead>
+                  <TableHead className="text-right">قطعه‌ها</TableHead>
+                  <TableHead className="text-right">وضعیت</TableHead>
+                  <TableHead className="text-right">عملیات</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {articles.map((a) => (
+                  <TableRow key={a.id}>
+                    <TableCell>
+                      <Link href={`/admin/kb/${a.id}`} className="font-bold text-[var(--primary)] hover:underline">
+                        {a.title}
+                      </Link>
+                      <div className="text-[11px] text-[var(--muted-foreground)]" dir="ltr">
+                        {a.slug}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="rounded-md text-[10px]">
+                        {a.category}
+                      </Badge>
+                    </TableCell>
+                    <TableCell dir="ltr" className="text-right text-xs">
+                      {a.chunkCount.toLocaleString("fa-IR")}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        className={`rounded-md text-[10px] ${
+                          a.status === "published"
+                            ? "bg-[var(--primary)]/10 text-[var(--primary)]"
+                            : "bg-[var(--secondary)] text-[var(--muted-foreground)]"
+                        }`}
+                      >
+                        {a.status === "published" ? "منتشرشده" : "پیش‌نویس"}
+                      </Badge>
+                      <span className="mr-1 text-[10px] text-[var(--muted-foreground)]">
+                        ({a.source === "seed" ? "بذری" : "ادمین"})
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="rounded-lg text-xs"
+                        onClick={() => togglePublish(a)}
+                        disabled={busy}
+                      >
+                        {a.status === "published" ? "پیش‌نویس" : "انتشار"}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+        )}
       </div>
-      {status && <p className="text-xs text-[var(--muted-foreground)]">{status}</p>}
-      {articles === null ? (
-        <p className="text-sm text-[var(--muted-foreground)]">…در حال بارگذاری</p>
-      ) : (
-        <div className="overflow-hidden rounded-2xl border border-[var(--border)]">
-          <table className="w-full text-sm">
-            <thead className="bg-[var(--card)] text-xs text-[var(--muted-foreground)]">
-              <tr>
-                <th className="p-3 text-right">عنوان</th>
-                <th className="p-3 text-right">دسته</th>
-                <th className="p-3 text-right">قطعه‌ها</th>
-                <th className="p-3 text-right">وضعیت</th>
-                <th className="p-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {articles.map((a) => (
-                <tr key={a.id} className="border-t border-[var(--border)] bg-[var(--card)]">
-                  <td className="p-3">
-                    <Link href={`/admin/kb/${a.id}`} className="font-bold text-[var(--primary)]">
-                      {a.title}
-                    </Link>
-                    <div className="text-xs text-[var(--muted-foreground)]" dir="ltr">{a.slug}</div>
-                  </td>
-                  <td className="p-3 text-xs">{a.category}</td>
-                  <td className="p-3 text-xs">{a.chunkCount.toLocaleString("fa-IR")}</td>
-                  <td className="p-3 text-xs">
-                    {a.status === "published" ? "منتشرشده" : "پیش‌نویس"}
-                    <span className="mr-1 text-[var(--muted-foreground)]">({a.source === "seed" ? "بذری" : "ادمین"})</span>
-                  </td>
-                  <td className="p-3">
-                    <button
-                      onClick={() => togglePublish(a)}
-                      disabled={busy}
-                      className="rounded-lg border border-[var(--border)] px-3 py-1 text-xs"
-                    >
-                      {a.status === "published" ? "پیش‌نویس" : "انتشار"}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
+    </AdminShell>
   );
 }

@@ -1,11 +1,18 @@
 "use client";
 
-// Admin KB article editor: title/category/tags/body + status; saving re-chunks
+// Admin KB article editor (dashboard-mock language): saving re-chunks
 // and re-indexes the article.
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { AdminShell } from "@/components/admin/AdminShell";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/client/api";
 
 interface Article {
@@ -54,68 +61,83 @@ export default function AdminKbEditPage() {
     }
   }
 
-  if (!a) return <div className="p-8 text-center text-sm">{status ?? "…در حال بارگذاری"}</div>;
+  if (!a) {
+    return (
+      <AdminShell title="ویرایش مقاله">
+        <p className="p-8 text-center text-sm text-[var(--muted-foreground)]">{status ?? "…در حال بارگذاری"}</p>
+      </AdminShell>
+    );
+  }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4 p-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-black">ویرایش مقاله</h1>
-        <Link href="/admin/kb" className="text-sm font-bold text-[var(--primary)]">فهرست</Link>
+    <AdminShell
+      title="ویرایش مقاله"
+      action={
+        <Button variant="ghost" size="sm" className="rounded-lg text-xs" asChild>
+          <Link href="/admin/kb">← فهرست مقاله‌ها</Link>
+        </Button>
+      }
+    >
+      <div className="mx-auto max-w-3xl">
+        <Card>
+          <CardContent className="space-y-4 px-5 py-5">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold">عنوان</Label>
+              <Input
+                value={a.title}
+                onChange={(e) => setA({ ...a, title: e.target.value })}
+                className="rounded-lg"
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold">دسته</Label>
+                <Input
+                  value={a.category}
+                  onChange={(e) => setA({ ...a, category: e.target.value })}
+                  className="rounded-lg"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold">برچسب‌ها (با کاما)</Label>
+                <Input
+                  value={a.tags.join(", ")}
+                  onChange={(e) =>
+                    setA({ ...a, tags: e.target.value.split(",").map((t) => t.trim()).filter(Boolean) })
+                  }
+                  className="rounded-lg"
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold">متن (Markdown)</Label>
+              <Textarea
+                value={a.bodyMd}
+                onChange={(e) => setA({ ...a, bodyMd: e.target.value })}
+                rows={18}
+                dir="rtl"
+                className="rounded-lg font-mono text-xs leading-6"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                id="kb-published"
+                checked={a.status === "published"}
+                onCheckedChange={(v) => setA({ ...a, status: v ? "published" : "draft" })}
+              />
+              <Label htmlFor="kb-published" className="text-xs font-bold">
+                منتشرشده (در جستجوی چت هست)
+              </Label>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button className="rounded-lg font-bold" onClick={save} disabled={busy}>
+                ذخیره و ایندکس
+              </Button>
+              {status && <p className="text-xs text-[var(--muted-foreground)]">{status}</p>}
+            </div>
+          </CardContent>
+        </Card>
       </div>
-      <div className="space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
-        <label className="block text-sm">
-          <span className="mb-1 block font-bold">عنوان</span>
-          <input
-            value={a.title}
-            onChange={(e) => setA({ ...a, title: e.target.value })}
-            className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--primary)]"
-          />
-        </label>
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <label className="block">
-            <span className="mb-1 block font-bold">دسته</span>
-            <input
-              value={a.category}
-              onChange={(e) => setA({ ...a, category: e.target.value })}
-              className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--primary)]"
-            />
-          </label>
-          <label className="block">
-            <span className="mb-1 block font-bold">برچسب‌ها (با کاما)</span>
-            <input
-              value={a.tags.join(", ")}
-              onChange={(e) => setA({ ...a, tags: e.target.value.split(",").map((t) => t.trim()).filter(Boolean) })}
-              className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--primary)]"
-            />
-          </label>
-        </div>
-        <label className="block text-sm">
-          <span className="mb-1 block font-bold">متن (Markdown)</span>
-          <textarea
-            value={a.bodyMd}
-            onChange={(e) => setA({ ...a, bodyMd: e.target.value })}
-            rows={18}
-            dir="rtl"
-            className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] p-3 font-mono text-xs leading-6 outline-none focus:border-[var(--primary)]"
-          />
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={a.status === "published"}
-            onChange={(e) => setA({ ...a, status: e.target.checked ? "published" : "draft" })}
-          />
-          منتشرشده (در جستجوی چت هست)
-        </label>
-        <button
-          onClick={save}
-          disabled={busy}
-          className="rounded-xl bg-[var(--primary)] px-4 py-2 text-sm font-bold text-[var(--primary-foreground)] disabled:opacity-50"
-        >
-          ذخیره و ایندکس
-        </button>
-        {status && <p className="text-xs text-[var(--muted-foreground)]">{status}</p>}
-      </div>
-    </div>
+    </AdminShell>
   );
 }
