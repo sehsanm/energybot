@@ -25,6 +25,12 @@ describe("draftFromProfile", () => {
     expect(draft.area_m2).toBe(75);
     expect(draft.motivations).toEqual(["help_country"]);
   });
+
+  it("coerces Persian-digit strings so legacy «۳» rows resume instead of re-asking", () => {
+    const draft = draftFromProfile({ household: { occupants: "۳", area_m2: "۱۲۵" } });
+    expect(draft.occupants).toBe(3);
+    expect(draft.area_m2).toBe(125);
+  });
 });
 
 describe("isStepValid", () => {

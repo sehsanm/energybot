@@ -4,6 +4,8 @@
  * Spec: docs/superpowers/specs/2026-10-03-v2.6-onboarding-wizard-design.md §3
  */
 
+import { normalizeFaDigits } from "@/lib/billing/billNumbers";
+
 export type OnboardingStepKey =
   | "welcome"
   | "home"
@@ -40,9 +42,13 @@ export type ProfileLike = {
   behaviour?: Record<string, unknown>;
 };
 
-/** Legacy rows store numbers as strings; coerce safely, else undefined. */
-const num = (v: unknown): number | undefined =>
-  typeof v === "number" ? v : v != null && v !== "" && !isNaN(Number(v)) ? Number(v) : undefined;
+/** Legacy rows store numbers as strings (ASCII or Persian digits); coerce safely, else undefined. */
+const num = (v: unknown): number | undefined => {
+  if (typeof v === "number") return v;
+  if (v == null || v === "") return undefined;
+  const n = Number(normalizeFaDigits(String(v)));
+  return Number.isNaN(n) ? undefined : n;
+};
 
 const str = (v: unknown): string | undefined =>
   typeof v === "string" && v.trim() !== "" ? v.trim() : undefined;

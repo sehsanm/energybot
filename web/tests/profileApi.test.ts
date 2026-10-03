@@ -19,6 +19,22 @@ describe("applyProfileUpdate", () => {
     expect(h.occupants).toBe(3);
     expect(h.area_m2).toBe(75);
   });
+  it("normalizes Persian-digit strings in numeric fields before storing", () => {
+    const db = makeTestDb();
+    const uid = seedUser(db);
+    applyProfileUpdate(db, uid, { occupants: "۳" });
+    const h = JSON.parse(getProfileRow(db, uid)!.household);
+    expect(h.occupants).toBe(3);
+  });
+  it("empty string on a numeric field removes the stored key without clobbering siblings", () => {
+    const db = makeTestDb();
+    const uid = seedUser(db);
+    applyProfileUpdate(db, uid, { occupants: 3, area_m2: 75 });
+    applyProfileUpdate(db, uid, { area_m2: "" });
+    const h = JSON.parse(getProfileRow(db, uid)!.household);
+    expect("area_m2" in h).toBe(false); // key deleted, not kept behind «ذخیره شد»
+    expect(h.occupants).toBe(3);
+  });
   it("accepts only known behaviour keys and merges shallowly", () => {
     const db = makeTestDb();
     const uid = seedUser(db);

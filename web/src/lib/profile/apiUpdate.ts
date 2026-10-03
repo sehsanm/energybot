@@ -1,6 +1,7 @@
 // PUT /api/profile body application logic, extracted from the route so it is
 // unit-testable without HTTP. The route is a thin wrapper (auth/csrf/parse).
 
+import { normalizeFaDigits } from "@/lib/billing/billNumbers";
 import { type DB } from "@/lib/db";
 import { MOTIVATION_OPTIONS, TOOLBOX_OPTIONS } from "@/lib/onboarding/steps";
 import { getProfileRow, updateProfileParts } from "@/lib/profile/parts";
@@ -20,11 +21,13 @@ const NUMERIC_FIELDS = ["occupants", "area_m2"] as const;
 const MOTIVATION_VALUES = MOTIVATION_OPTIONS.map((o) => o.value) as string[];
 const TOOLBOX_VALUES = TOOLBOX_OPTIONS.map((o) => o.value) as string[];
 
-/** Numbers pass through; numeric-looking strings parse; anything else is rejected (not NaN). */
+/** Numbers pass through; numeric-looking strings parse (Persian/Arabic digits normalized first —
+ * JS Number() rejects «۳»); anything else is rejected (not NaN). Empty strings never reach here;
+ * applyProfileUpdate turns them into a key deletion. */
 const numeric = (v: unknown): number | undefined => {
   if (typeof v === "number") return v;
   if (typeof v === "string" && v.trim() !== "") {
-    const n = Number(v);
+    const n = Number(normalizeFaDigits(v));
     return Number.isNaN(n) ? undefined : n;
   }
   return undefined;
@@ -77,6 +80,13 @@ export function applyProfileUpdate(
     const v = body[f];
     if (v === undefined) continue;
     if ((NUMERIC_FIELDS as readonly string[]).includes(f)) {
+      if (typeof v === "string" && v.trim() === "") {
+        // "" → clear the stored key (profile shows empty, wizard resume re-asks):
+        // the undefined survives updateProfileParts' spread-merge as an override
+        // and JSON.stringify drops it, deleting the key on write.
+        household[f] = undefined;
+        continue;
+      }
       const n = numeric(v);
       if (n === undefined) continue; // NaN / unparseable → rejected
       household[f] = n;

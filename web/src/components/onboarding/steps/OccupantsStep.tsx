@@ -40,7 +40,7 @@ export function OccupantsStep({ draft, setDraft }: StepProps) {
           <Button
             variant="secondary"
             size="icon-lg"
-            aria-label="کم‌کردن ساکنان"
+            aria-label={w.occupantsMinusLabel}
             className="rounded-full"
             onClick={() => nudge(-1)}
             disabled={n <= MIN}
@@ -53,7 +53,7 @@ export function OccupantsStep({ draft, setDraft }: StepProps) {
           <Button
             variant="secondary"
             size="icon-lg"
-            aria-label="اضافه‌کردن ساکنان"
+            aria-label={w.occupantsPlusLabel}
             className="rounded-full"
             onClick={() => nudge(1)}
             disabled={n >= MAX}

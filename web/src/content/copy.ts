@@ -93,6 +93,8 @@ export const copy = {
     occupants: {
       prompt: "چند نفر توی خونه زندگی می‌کنید و خونه چقدر بزرگه؟",
       occupantsLabel: "تعداد ساکنان",
+      occupantsMinusLabel: "کم‌کردن ساکنان",
+      occupantsPlusLabel: "اضافه‌کردن ساکنان",
       areaLabel: "متراژ خونه (متر مربع)",
     },
     systems: {
