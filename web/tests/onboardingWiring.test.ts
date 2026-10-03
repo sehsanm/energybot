@@ -19,4 +19,31 @@ describe("onboarding wiring", () => {
     const page = readFileSync(join(root, "src/app/welcome/page.tsx"), "utf8");
     expect(page).toMatch(/behaviour\s*:/); // passed into setProfile, not dropped
   });
+
+  test("/home redirects un-onboarded sessions and swaps its empty state for the welcome card", () => {
+    const home = readFileSync(join(root, "src/components/screens/HomeScreen.tsx"), "utf8");
+    expect(home).toContain("shouldRedirectToWelcome");
+    expect(home).toContain('replace("/welcome")');
+    // The decision must be ref-guarded so a re-render never double-fires it.
+    expect(home).toMatch(/redirectedRef/);
+    // Un-onboarded + empty profile → welcome card, not the first-bill prompt.
+    expect(home).toMatch(/homeCard|welcomeCard/);
+  });
+
+  test("profile screen edits behaviour.service_prefs through the toolbox options", () => {
+    const profile = readFileSync(join(root, "src/components/screens/ProfileScreen.tsx"), "utf8");
+    expect(profile).toContain("TOOLBOX_OPTIONS");
+    expect(profile).toMatch(/service_prefs/);
+    expect(profile).toMatch(/behaviour:\s*\{\s*service_prefs/); // saved via PUT behaviour
+  });
+});
+
+import { shouldRedirectToWelcome } from "@/lib/onboarding/shouldRedirectToWelcome";
+
+describe("shouldRedirectToWelcome", () => {
+  test("only un-onboarded, loaded sessions redirect — bot-completed users never do", () => {
+    expect(shouldRedirectToWelcome({ onboarded: false })).toBe(true);
+    expect(shouldRedirectToWelcome({ onboarded: true })).toBe(false); // bot-lite or app completions
+    expect(shouldRedirectToWelcome(null)).toBe(false); // still loading / anon handled by gate
+  });
 });

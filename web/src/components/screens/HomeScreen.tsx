@@ -2,8 +2,12 @@
 
 // Home screen (Stitch 01-home): greeting + avatar, streak/XP slot (v3-ready,
 // hidden at zero), latest-bill card, insights preview, quick actions.
+// Also the onboarding entry point (spec §6): un-onboarded sessions are taken
+// over by /welcome, and a skipped wizard leaves a «کامل کردن پروفایل» card
+// here instead of the first-bill empty state until the profile has data.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Zap, MessageCircle, Receipt, GraduationCap, ChevronLeft } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { StreakFlame } from "@/components/kit/StreakFlame";
@@ -14,6 +18,9 @@ import { Badge } from "@/components/ui/badge";
 import { useUserNav } from "@/lib/nav/UserNav";
 import { toFaDigits } from "@/components/kit/logic";
 import { api } from "@/lib/client/api";
+import { copy } from "@/content/copy";
+import { shouldRedirectToWelcome } from "@/lib/onboarding/shouldRedirectToWelcome";
+import { draftFromProfile, type ProfileLike } from "@/lib/onboarding/steps";
 
 interface BillJson {
   id: string;
@@ -25,22 +32,55 @@ interface BillJson {
   createdAt: number;
 }
 
+interface MeJson {
+  user: { displayName: string | null };
+  onboarded: boolean;
+}
+
 export default function HomeScreen() {
+  const router = useRouter();
   const { go } = useUserNav();
-  const [name, setName] = useState<string | null>(null);
+  // null until /api/me answers; a failed fetch leaves it null (render as today).
+  const [me, setMe] = useState<MeJson | null>(null);
+  const [meFailed, setMeFailed] = useState(false);
   const [bills, setBills] = useState<BillJson[] | null>(null);
+  // Only fetched while un-onboarded: it decides welcome card vs first-bill
+  // empty state. null (unknown / fetch failed) means "has data", so the
+  // first-bill prompt stays the default.
+  const [profileEmpty, setProfileEmpty] = useState<boolean | null>(null);
+  // replace() must fire once per mount even if the effect re-runs (dev
+  // StrictMode, me settling twice) — the ref, not the closure, decides.
+  const redirectedRef = useRef(false);
 
   useEffect(() => {
-    api<{ user: { displayName: string | null } }>("/api/me")
-      .then((d) => setName(d.user.displayName))
-      .catch(() => {});
+    api<MeJson>("/api/me").then(setMe).catch(() => setMeFailed(true));
     api<{ bills: BillJson[] }>("/api/bills")
       .then((d) => setBills(d.bills))
       .catch(() => setBills([]));
   }, []);
 
+  // Entry rule (spec §6): an un-onboarded session never lands on /home.
+  useEffect(() => {
+    if (me === null || redirectedRef.current) return;
+    if (!shouldRedirectToWelcome(me)) return;
+    redirectedRef.current = true;
+    router.replace("/welcome");
+  }, [me, router]);
+
+  // The welcome card replaces the first-bill empty state only while the
+  // profile carries no wizard data at all (the same freshness rule the
+  // wizard uses to pick its start step).
+  useEffect(() => {
+    if (me === null || me.onboarded !== false) return;
+    api<ProfileLike>("/api/profile")
+      .then((d) => setProfileEmpty(Object.values(draftFromProfile(d)).every((v) => v === undefined)))
+      .catch(() => setProfileEmpty(false));
+  }, [me]);
+
   const latest = bills?.[0];
-  const firstName = (name ?? "دوست من").split(" ")[0];
+  const firstName = (me?.user.displayName ?? "دوست من").split(" ")[0];
+  const loading = bills === null || (me === null && !meFailed);
+  const welcomeCard = me?.onboarded === false && profileEmpty === true && !latest;
 
   return (
     <AppShell>
@@ -58,7 +98,7 @@ export default function HomeScreen() {
           <StreakFlame days={0} />
         </div>
 
-        {bills === null ? (
+        {loading ? (
           <Card>
             <CardContent className="py-8 text-center text-sm text-[var(--muted-foreground)]">
               …در حال بارگذاری
@@ -123,6 +163,19 @@ export default function HomeScreen() {
               </CardContent>
             </Card>
           </>
+        ) : welcomeCard ? (
+          <EmptyState
+            icon="📝"
+            title={copy.onboardingWizard.homeCard.title}
+            desc={copy.onboardingWizard.homeCard.desc}
+          >
+            <Button
+              className="h-12 w-full rounded-full text-base font-black"
+              onClick={() => router.replace("/welcome")}
+            >
+              {copy.onboardingWizard.homeCard.cta}
+            </Button>
+          </EmptyState>
         ) : (
           <EmptyState
             icon="📄"

@@ -1,6 +1,8 @@
 "use client";
 
-// Profile screen (Stitch 04-profile): household form + goals.
+// Profile screen (Stitch 04-profile): household form + goals + the «ابزارها»
+// editor for behaviour.service_prefs (spec §7 — the wizard's «هر وقت خواستی
+// عوضش کنی» promise).
 
 import { useEffect, useState } from "react";
 import { UserRound } from "lucide-react";
@@ -10,7 +12,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { OptionCards, toggleValue, type CardOption } from "@/components/onboarding/steps/controls";
+import { copy } from "@/content/copy";
 import { api } from "@/lib/client/api";
+import { TOOLBOX_OPTIONS, draftFromProfile } from "@/lib/onboarding/steps";
 
 const FIELDS: { key: string; label: string; placeholder?: string; numeric?: boolean }[] = [
   { key: "city", label: "شهر", placeholder: "تهران" },
@@ -23,17 +28,26 @@ const FIELDS: { key: string; label: string; placeholder?: string; numeric?: bool
 ];
 
 export default function ProfileScreen() {
+  const t = copy.onboardingWizard.profileToolbox;
+  const toolboxEmojis = copy.onboardingWizard.toolbox.emojis;
   const [values, setValues] = useState<Record<string, string>>({});
   const [goals, setGoals] = useState<{ text: string }[]>([]);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  // «ابزارها» multi-select, bound to behaviour.service_prefs.
+  const [prefs, setPrefs] = useState<string[]>([]);
+  const [prefsBusy, setPrefsBusy] = useState(false);
+  const [prefsSaved, setPrefsSaved] = useState(false);
 
   useEffect(() => {
     api<{ household: Record<string, string>; goals: { text: string }[] }>("/api/profile")
       .then((d) => {
         setValues(Object.fromEntries(Object.entries(d.household ?? {}).map(([k, v]) => [k, String(v)])));
         setGoals(d.goals ?? []);
+        // draftFromProfile is the shared mapper: it filters service_prefs to
+        // real strings, so the chips start from exactly what the server has.
+        setPrefs(draftFromProfile(d).service_prefs ?? []);
         setLoaded(true);
       })
       .catch(() => setLoaded(true));
@@ -47,6 +61,17 @@ export default function ProfileScreen() {
       setSaved(true);
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function savePrefs() {
+    setPrefsBusy(true);
+    setPrefsSaved(false);
+    try {
+      await api("/api/profile", { method: "PUT", body: { behaviour: { service_prefs: prefs } } });
+      setPrefsSaved(true);
+    } finally {
+      setPrefsBusy(false);
     }
   }
 
@@ -109,6 +134,38 @@ export default function ProfileScreen() {
                   </li>
                 ))}
               </ul>
+            </CardContent>
+          </Card>
+        )}
+
+        {loaded && (
+          <Card>
+            <CardContent className="space-y-3 px-4">
+              <div className="space-y-1">
+                <h2 className="font-black">{t.title}</h2>
+                <p className="text-sm font-bold leading-7">{t.prompt}</p>
+              </div>
+              <OptionCards
+                options={TOOLBOX_OPTIONS.map(
+                  (o): CardOption<string> => ({ label: o.label, value: o.value, emoji: toolboxEmojis[o.value] }),
+                )}
+                selected={prefs}
+                onToggle={(value) =>
+                  setPrefs((p) => toggleValue(p, value, TOOLBOX_OPTIONS.map((o) => o.value)))
+                }
+              />
+              <Button
+                variant="secondary"
+                className="h-11 w-full rounded-full text-sm font-black"
+                onClick={savePrefs}
+                disabled={prefsBusy}
+              >
+                {t.saveBtn}
+              </Button>
+              {prefsSaved && (
+                <p className="text-center text-xs font-bold text-[var(--primary)]">{t.savedMsg}</p>
+              )}
+              <p className="text-xs leading-6 text-[var(--muted-foreground)]">{t.hint}</p>
             </CardContent>
           </Card>
         )}

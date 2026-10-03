@@ -135,6 +135,21 @@ export const copy = {
       subtitle: "پروفایلت آماده‌ست؛ از این به بعد پیشنهادها و تحلیل‌ها دقیق‌تر می‌شن",
       goHomeBtn: "بریم خانه",
     },
+    // /home stand-in for the first-bill empty state while onboarding is
+    // unfinished and no profile data exists yet (spec §6 skip landing).
+    homeCard: {
+      title: "کامل کردن پروفایل",
+      desc: "چند سؤال کوتاه جواب بده تا تحلیل‌ها و پیشنهادها دقیقاً مخصوص خونهٔ خودت بشه",
+      cta: "شروع کن",
+    },
+    // ProfileScreen «ابزارها» editor — the legacy «هر وقت خواستی عوضش کنی» promise.
+    profileToolbox: {
+      title: "🧰 ابزارها",
+      prompt: "چه کمک‌هایی رو می‌خوای ازم بگیری؟",
+      hint: "هیچ‌کدوم اجباری نیست؛ هر وقت خواستی همین‌جا عوضش کنی",
+      saveBtn: "ذخیره ابزارها",
+      savedMsg: "ذخیره شد ✅",
+    },
   },
 } as const;
 
