@@ -2,8 +2,12 @@
 
 const FA = "۰۱۲۳۴۵۶۷۸۹";
 
+/** Persian digits, and the Arabic thousands separator ٬ (U+066C) for commas —
+ *  parity with the legacy renderer (billing/service.py _to_persian_digits). */
 export function toPersianDigits(s: string | number): string {
-  return String(s).replace(/[0-9]/g, (d) => FA[Number(d)]);
+  return String(s)
+    .replace(/[0-9]/g, (d) => FA[Number(d)])
+    .replace(/,/g, "٬");
 }
 
 export function fmtAmountRial(rial: number): string {

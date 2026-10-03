@@ -30,16 +30,29 @@ export class TelegramClient implements BotClient {
     return `${this.base}/file/bot${this.token}/${filePath}`;
   }
 
-  private async fetch(url: string, init: Record<string, unknown> = {}): Promise<Response> {
-    return undiciFetch(url, { ...init, dispatcher: this.dispatcher }) as unknown as Response;
+  private async fetch(url: string, init: Record<string, unknown> = {}, timeoutMs = 60_000): Promise<Response> {
+    // A hung proxy connection must not stall the strictly-sequential poller
+    // for undici's default 300s (legacy used httpx.Timeout(30) everywhere).
+    return undiciFetch(url, {
+      ...init,
+      dispatcher: this.dispatcher,
+      signal: AbortSignal.timeout(timeoutMs),
+    }) as unknown as Response;
   }
 
   async call(method: string, payload?: Record<string, unknown>): Promise<unknown> {
-    const r = await this.fetch(this.url(method), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload ?? {}),
-    });
+    // getUpdates long-polls for `timeout` seconds — the request timeout must
+    // exceed it; everything else gets the standard 60s.
+    const isPoll = method === "getUpdates" && typeof payload?.timeout === "number";
+    const r = await this.fetch(
+      this.url(method),
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload ?? {}),
+      },
+      isPoll ? Number(payload!.timeout) * 1000 + 30_000 : 60_000,
+    );
     if (!r.ok) throw new Error(`telegram ${method} http ${r.status}: ${(await r.text()).slice(0, 200)}`);
     const data = (await r.json()) as { ok: boolean; result?: unknown; description?: string };
     if (!data.ok) throw new Error(`telegram ${method} not ok: ${data.description ?? ""}`);

@@ -41,6 +41,19 @@ export function useMiniApp(): MiniAppContextValue {
   return useContext(MiniAppContext);
 }
 
+/** Wire the host BackButton (both hosts); no-op in a plain browser. */
+export function useBackButton(onClick: () => void, opts: { visible?: boolean } = {}): void {
+  const { webApp, ready } = useMiniApp();
+  useEffect(() => {
+    if (!ready || !webApp?.BackButton) return;
+    const bb = webApp.BackButton;
+    bb.onClick?.(onClick);
+    if (opts.visible !== false) bb.show?.();
+    else bb.hide?.();
+    return () => bb.hide?.();
+  }, [ready, webApp, onClick, opts.visible]);
+}
+
 function detectHost(): { host: MiniAppHost; webApp: WebAppLike | null } {
   if (typeof window === "undefined") return { host: "browser", webApp: null };
   const tg = (window as any).Telegram?.WebApp;

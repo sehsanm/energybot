@@ -78,6 +78,7 @@ export const messages = sqliteTable(
 );
 
 // Poller dedup. update_id sequences are per-bot, so the key is (channel, update_id).
+// UNIQUE — a second process polling the same bot must not double-handle updates.
 export const processedUpdates = sqliteTable(
   "processed_updates",
   {
@@ -85,7 +86,7 @@ export const processedUpdates = sqliteTable(
     updateId: text("update_id").notNull(),
     createdAt: integer("created_at").notNull(),
   },
-  (t) => [index("pk_processed_updates").on(t.channel, t.updateId)],
+  (t) => [uniqueIndex("uq_processed_updates_channel_update").on(t.channel, t.updateId)],
 );
 
 export const adminUsers = sqliteTable("admin_users", {

@@ -34,11 +34,17 @@ export class Poller {
       )
       .get();
     if (existing) return true;
-    this.db
-      .insert(schema.processedUpdates)
-      .values({ channel: this.client.channel, updateId, createdAt: now() })
-      .run();
-    return false;
+    try {
+      this.db
+        .insert(schema.processedUpdates)
+        .values({ channel: this.client.channel, updateId, createdAt: now() })
+        .run();
+      return false;
+    } catch (e) {
+      // UNIQUE conflict = another writer claimed it first → already processed.
+      if (e instanceof Error && e.message.includes("UNIQUE")) return true;
+      throw e;
+    }
   }
 
   private cleanupOldUpdates(): void {
@@ -77,11 +83,13 @@ export class Poller {
       }
       for (const upd of updates) {
         const updateId = Number(upd.update_id ?? 0);
-        if (updateId > 0 && this.alreadyProcessed(String(updateId))) {
-          this.offset = updateId + 1;
-          continue;
-        }
+        // Dedup + dispatch are both inside the guard: a DB-level throw must
+        // skip the update, never kill the poller loop (legacy behaviour).
         try {
+          if (updateId > 0 && this.alreadyProcessed(String(updateId))) {
+            this.offset = updateId + 1;
+            continue;
+          }
           await this.onUpdate(upd);
         } catch (e) {
           console.error(`[${this.client.channel}] update handler error:`, e);

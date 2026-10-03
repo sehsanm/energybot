@@ -12,6 +12,7 @@ import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { Client } from "pg";
 import { getDb, now, schema } from "../src/lib/db";
+import { camelizeLegacyDetails, legacyStoredAmount } from "../src/lib/billing/legacyDetails";
 
 const argv = process.argv.slice(2);
 const DRY_RUN = argv.includes("--dry-run");
@@ -107,6 +108,7 @@ async function main(): Promise<void> {
               model: b.suggestions.model ?? "legacy",
             })
           : null;
+        const details = camelizeLegacyDetails(b.details);
         db.insert(schema.bills)
           .values({
             id: randomUUID(),
@@ -114,11 +116,11 @@ async function main(): Promise<void> {
             billId: String(b.bill_id),
             payId: b.pay_id ? String(b.pay_id) : null,
             utilityType: b.utility_type,
-            amount: Number(b.amount ?? 0),
+            amount: legacyStoredAmount(b.details, Number(b.amount ?? 0)),
             term: b.term,
             dueDate: b.due_date,
             consumption: b.consumption != null ? Number(b.consumption) : null,
-            details: JSON.stringify(b.details ?? {}),
+            details: JSON.stringify(details),
             suggestions,
             createdAt: Date.parse(b.inquired_at) || now(),
             legacyId: b.id,

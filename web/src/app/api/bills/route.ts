@@ -6,6 +6,7 @@ import { getDb, schema } from "@/lib/db";
 import { currentUser, badCsrf, csrfGuard, unauth } from "@/lib/auth/api";
 import { captureBill } from "@/lib/billing/service";
 import { billToJson } from "@/lib/billing/json";
+import { guardUploadBytes, MAX_TEXT_LEN, MAX_UPLOAD_BYTES } from "@/lib/billing/upload";
 
 export const runtime = "nodejs";
 
@@ -27,6 +28,12 @@ export async function POST(req: Request): Promise<Response> {
   if (!user) return unauth();
   if (!csrfGuard(req, user.sessionId)) return badCsrf();
 
+  // Reject oversized bodies before buffering them into memory.
+  const contentLength = Number(req.headers.get("content-length") ?? 0);
+  if (contentLength > MAX_UPLOAD_BYTES + 64 * 1024) {
+    return Response.json({ error: "حجم فایل باید کمتر از ۱۰ مگابایت باشد." }, { status: 413 });
+  }
+
   const contentType = req.headers.get("content-type") ?? "";
   let input: { text?: string; imageBytes?: Buffer; pdfBytes?: Buffer };
   try {
@@ -36,9 +43,9 @@ export async function POST(req: Request): Promise<Response> {
       const text = (form.get("text") as string | null)?.trim() || undefined;
       if (file) {
         const bytes = Buffer.from(await file.arrayBuffer());
-        const name = file.name.toLowerCase();
-        const isPdf = file.type === "application/pdf" || name.endsWith(".pdf");
-        input = isPdf ? { pdfBytes: bytes } : { imageBytes: bytes };
+        const guard = guardUploadBytes(bytes, file.name);
+        if (!guard.ok) return Response.json({ error: guard.error }, { status: 415 });
+        input = guard.kind === "pdf" ? { pdfBytes: bytes } : { imageBytes: bytes };
       } else {
         input = { text };
       }
@@ -48,6 +55,9 @@ export async function POST(req: Request): Promise<Response> {
     }
   } catch {
     return Response.json({ error: "bad request" }, { status: 400 });
+  }
+  if (input.text && input.text.length > MAX_TEXT_LEN) {
+    return Response.json({ error: "شناسه قبض خیلی طولانی است." }, { status: 422 });
   }
 
   const res = await captureBill(user.id, input);

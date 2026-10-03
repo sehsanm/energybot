@@ -41,7 +41,7 @@ describe("captureBill", () => {
     if (res.ok) {
       expect(res.isNew).toBe(true);
       expect(res.summary).toContain("📄 قبض برق");
-      expect(res.summary).toContain("۱,۴۰۰,۰۰۰ تومان"); // headline = period amount, not payable
+      expect(res.summary).toContain("۱٬۴۰۰٬۰۰۰ تومان"); // headline = period amount, not payable
     }
     const rows = db.select().from(schema.bills).where(eq(schema.bills.userId, user.id)).all();
     expect(rows).toHaveLength(1);
@@ -53,12 +53,21 @@ describe("captureBill", () => {
     const db = makeTestDb();
     const { user } = resolveUser("bale", { externalId: "1" }, db);
     const first = await captureBill(user.id, { text: VALID_ID }, db, new FakeFinnotechClient(detail()));
-    const second = await captureBill(user.id, { text: VALID_ID }, db, new FakeFinnotechClient(detail({ amount: 16_000_000 })));
+    if (!first.ok) throw new Error("first capture failed");
+    // Seed a stored suggestion to verify the refresh invalidates it.
+    db.update(schema.bills)
+      .set({ suggestions: JSON.stringify({ intro: "قدیمی", tips: [], targets: [] }) })
+      .where(eq(schema.bills.id, first.billId))
+      .run();
+
+    const second = await captureBill(user.id, { text: VALID_ID }, db, new FakeFinnotechClient(detail({ dueDate: "1404/05/01", amount: 16_000_000 })));
     expect(first.ok && second.ok).toBe(true);
     if (second.ok) expect(second.isNew).toBe(false);
     const rows = db.select().from(schema.bills).where(eq(schema.bills.userId, user.id)).all();
     expect(rows).toHaveLength(1);
-    expect(rows[0].amount).toBe(16_000_000);
+    expect(rows[0].dueDate).toBe("1404/05/01"); // refreshed from the new inquiry
+    expect(rows[0].amount).toBe(14_000_000); // period cost wins over raw Finnotech amount (legacy parity)
+    expect(rows[0].suggestions).toBeNull(); // stale insights dropped so they regenerate
   });
 
   it("keeps bills of different terms separate", async () => {

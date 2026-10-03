@@ -6,16 +6,23 @@ import { getDb, now, schema, type DB } from "@/lib/db";
 import { env } from "@/lib/env";
 import type { BotClient } from "./types";
 
+// Memoized per channel: each TelegramClient owns a ProxyAgent connection pool,
+// so building one per send leaks pools (admin sends + insight delivery).
+const cache = new Map<string, BotClient>();
+
 export async function botClientFor(channel: string): Promise<BotClient | null> {
+  const cached = cache.get(channel);
+  if (cached) return cached;
+  let client: BotClient | null = null;
   if (channel === "bale" && env.baleEnabled() && env.baleToken()) {
     const { BaleClient } = await import("./bale");
-    return BaleClient.fromEnv();
-  }
-  if (channel === "telegram" && env.telegramEnabled() && env.telegramToken()) {
+    client = BaleClient.fromEnv();
+  } else if (channel === "telegram" && env.telegramEnabled() && env.telegramToken()) {
     const { TelegramClient } = await import("./telegram");
-    return TelegramClient.fromEnv();
+    client = TelegramClient.fromEnv();
   }
-  return null;
+  if (client) cache.set(channel, client);
+  return client;
 }
 
 /** Send to every enabled identity of the user; returns channels delivered to. */

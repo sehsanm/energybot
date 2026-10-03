@@ -63,7 +63,14 @@ utility), bill photo/PDF/typed-ID capture → summary → AI insights, `/web` ma
 link, mini-app buttons.
 
 Mini-app setup (ops): set the bot menu button to `PUBLIC_BASE_URL` on both
-platforms (BotFather for Telegram, @BotAdmin for Bale).
+platforms (BotFather for Telegram, @BotAdmin for Bale). The host bridge scripts
+(`telegram-web-app.js`, `tapi.bale.ai/miniapp.js`) are loaded by the app's root
+layout automatically — hosts do not inject them.
+
+Documented deviations from the plan: navigation uses Next App-Router client
+navigation instead of MemoryRouter (equivalent for a single Next app); the
+`mainButton` host API is deferred to the Stitch design pass (`backButton` is
+available via `useBackButton`).
 
 ## Deploy (single VPS container)
 

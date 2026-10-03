@@ -2,7 +2,7 @@
 // v1-simplified): commands, onboarding-lite (city + utility), bill capture,
 // insights callback. All sends go through the channel-agnostic BotClient.
 
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { getDb, now, schema, type DB } from "@/lib/db";
 import { env } from "@/lib/env";
 import { copy } from "@/content/copy";
@@ -10,6 +10,7 @@ import { captureBill, priorBill } from "@/lib/billing/service";
 import { generateSuggestions, renderSuggestions, targetsAsGoals } from "@/lib/billing/suggestions";
 import { parseBillNumbers, InvalidBillNumbersError } from "@/lib/billing/billNumbers";
 import { replaceGoalsForBill } from "@/lib/profile/goals";
+import { guardUploadBytes, MAX_UPLOAD_BYTES } from "@/lib/billing/upload";
 import type { BotClient } from "@/lib/channels/types";
 import { resolveUser } from "./identity";
 
@@ -116,7 +117,15 @@ async function generateAndSendInsights(
     await client.sendMessage(chatId, copy.insightsFailed);
     return false;
   }
-  db.update(schema.bills).set({ suggestions: JSON.stringify(payload) }).where(eq(schema.bills.id, billRowId)).run();
+  // Claim the bill atomically: only the first generator wins (legacy
+  // set_bill_suggestions_if_absent). A second concurrent run (button tap while
+  // the capture-spawned task is in flight) loses and sends nothing.
+  const claim = db
+    .update(schema.bills)
+    .set({ suggestions: JSON.stringify(payload) })
+    .where(and(eq(schema.bills.id, billRowId), isNull(schema.bills.suggestions)))
+    .run();
+  if (!claim.changes) return false;
   replaceGoalsForBill(db, userId, billRowId, targetsAsGoals(payload.targets, billRowId));
   await client.sendMessage(chatId, renderSuggestions(payload));
   logMessage(db, userId, client.channel, "bot", renderSuggestions(payload), { kind: "insights", billId: billRowId });
@@ -182,6 +191,7 @@ export async function handleBotUpdate(
       },
       db,
     );
+    if (user.isBlocked) return; // silent drop — admin block applies to the bot too
     const data = String(cb.data ?? "");
     if (data.startsWith("insights:")) {
       await generateAndSendInsights(client, chatId, user.id, data.slice("insights:".length), db);
@@ -206,14 +216,24 @@ export async function handleBotUpdate(
     },
     db,
   );
+  if (user.isBlocked) return; // silent drop — admin block applies to the bot too
   await client.sendChatAction(chatId);
 
   // Bill photo (take the largest size).
   if (Array.isArray(msg.photo) && msg.photo.length > 0) {
     logMessage(db, user.id, client.channel, "user", "[عکس قبض]");
     try {
-      const fileId = msg.photo[msg.photo.length - 1].file_id;
-      const bytes = await client.downloadFile(await client.getFile(fileId));
+      const largest = msg.photo[msg.photo.length - 1];
+      if ((largest.file_size ?? 0) > MAX_UPLOAD_BYTES) {
+        await client.sendMessage(chatId, copy.tooLarge);
+        return;
+      }
+      const bytes = await client.downloadFile(await client.getFile(largest.file_id));
+      const guard = guardUploadBytes(bytes);
+      if (!guard.ok) {
+        await client.sendMessage(chatId, copy.photoFailed);
+        return;
+      }
       await runCapture(client, chatId, user.id, { imageBytes: bytes }, db);
     } catch (e) {
       console.error("[bot] photo billing failed:", e);
@@ -224,18 +244,20 @@ export async function handleBotUpdate(
 
   // Documents: bill PDFs or images sent as file.
   if (msg.document) {
-    const mime = String(msg.document.mime_type ?? "");
     const name = String(msg.document.file_name ?? "").toLowerCase();
-    const isPdf = mime === "application/pdf" || name.endsWith(".pdf");
-    const isImage = mime.startsWith("image/");
-    if (!isPdf && !isImage) {
-      await client.sendMessage(chatId, copy.docUnsupported);
+    if ((msg.document.file_size ?? 0) > MAX_UPLOAD_BYTES) {
+      await client.sendMessage(chatId, copy.tooLarge);
       return;
     }
     logMessage(db, user.id, client.channel, "user", `[فایل قبض ${name}]`);
     try {
       const bytes = await client.downloadFile(await client.getFile(msg.document.file_id));
-      await runCapture(client, chatId, user.id, isPdf ? { pdfBytes: bytes } : { imageBytes: bytes }, db);
+      const guard = guardUploadBytes(bytes, name);
+      if (!guard.ok) {
+        await client.sendMessage(chatId, guard.error);
+        return;
+      }
+      await runCapture(client, chatId, user.id, guard.kind === "pdf" ? { pdfBytes: bytes } : { imageBytes: bytes }, db);
     } catch (e) {
       console.error("[bot] document billing failed:", e);
       await client.sendMessage(chatId, copy.photoFailed);

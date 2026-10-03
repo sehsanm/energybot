@@ -165,15 +165,16 @@ describe("bot handler — bill capture", () => {
     expect(db.select().from(schema.bills).where(eq(schema.bills.userId, user.id)).all()).toHaveLength(1);
   });
 
-  it("non-bill documents get the Persian rejection", async () => {
+  it("non-bill documents get rejected after magic-byte sniffing", async () => {
     const db = makeTestDb();
     const bot = new FakeBot();
+    bot.fixtureFile = Buffer.from("just some plain text, definitely not an image");
     const upd = {
       update_id: 1,
       message: { from: { id: 12 }, chat: { id: 12 }, document: { file_id: "d", mime_type: "text/plain", file_name: "x.txt" } },
     };
     await handleBotUpdate(bot, upd, db);
-    expect(bot.texts()).toEqual([copy.docUnsupported]);
+    expect(bot.texts()[0]).toContain("فقط عکس"); // sniffed by content, not the .txt name
   });
 
   it("an invalid typed id is not routed to billing", async () => {
@@ -185,6 +186,31 @@ describe("bot handler — bill capture", () => {
 });
 
 describe("bot handler — callbacks & commands", () => {
+  it("blocked users are dropped silently (admin block covers the bot)", async () => {
+    const db = makeTestDb();
+    const bot = new FakeBot();
+    const { user } = resolveUser("bale", { externalId: "30" }, db);
+    db.update(schema.users).set({ isBlocked: true }).where(eq(schema.users.id, user.id)).run();
+    await handleBotUpdate(bot, textUpdate(30, "/start"), db);
+    await handleBotUpdate(bot, callbackUpdate(30, "onb:util:gas"), db);
+    expect(bot.sent).toHaveLength(0);
+  });
+
+  it("oversized documents get the size message without downloading", async () => {
+    const db = makeTestDb();
+    const bot = new FakeBot();
+    const upd = {
+      update_id: 2,
+      message: {
+        from: { id: 31 },
+        chat: { id: 31 },
+        document: { file_id: "d", mime_type: "application/pdf", file_name: "big.pdf", file_size: 11 * 1024 * 1024 },
+      },
+    };
+    await handleBotUpdate(bot, upd, db);
+    expect(bot.texts()).toEqual([copy.tooLarge]);
+  });
+
   it("insights callback renders stored suggestions without regenerating", async () => {
     const db = makeTestDb();
     const bot = new FakeBot();

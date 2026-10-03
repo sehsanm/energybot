@@ -1,7 +1,7 @@
 // Sessions for both user (mini app / magic link) and admin — port of legacy
 // core/security.py + user_api/auth.py semantics (sha256-id cookies, CSRF HMAC).
 
-import { createHash, createHmac, randomBytes } from "node:crypto";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { and, eq, gt } from "drizzle-orm";
 import { getDb, now, schema, type DB } from "@/lib/db";
 import { env } from "@/lib/env";
@@ -68,6 +68,9 @@ export function deleteSession(cookieValue: string | undefined | null, db: DB = g
 
 /** CSRF guard for mutating requests — double-submit header pattern. */
 export function csrfOk(sessionId: string | undefined, header: string | null | undefined): boolean {
-  if (!sessionId) return false;
-  return !!header && header === signCsrf(sessionId);
+  if (!sessionId || !header) return false;
+  const expected = Buffer.from(signCsrf(sessionId), "utf8");
+  const got = Buffer.from(header, "utf8");
+  // Constant-time compare, consistent with the initData hash check.
+  return expected.length === got.length && timingSafeEqual(expected, got);
 }

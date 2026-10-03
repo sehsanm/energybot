@@ -103,6 +103,12 @@ export async function captureBill(
     return { ok: false, error: "استعلام قبض الان ممکن نبود. چند لحظه بعد دوباره امتحان کن." };
   }
 
+  // Legacy parity: store the period cost when the inquiry provides it
+  // (repository.add_bill stored amounts.period ?? detail.amount).
+  const amounts = (detail.details.amounts ?? {}) as Record<string, unknown>;
+  const periodAmount = toNumberOrNull(amounts.period);
+  const storedAmount = periodAmount != null ? periodAmount : detail.amount;
+
   // Same user + bill id + term ⇒ same bill: refresh it instead of duplicating.
   const existing = db
     .select()
@@ -114,6 +120,7 @@ export async function captureBill(
         detail.term ? eq(schema.bills.term, detail.term) : eq(schema.bills.billId, detail.billId),
       ),
     )
+    .orderBy(desc(schema.bills.createdAt))
     .limit(1)
     .get();
 
@@ -122,14 +129,16 @@ export async function captureBill(
     db.update(schema.bills)
       .set({
         payId: detail.payId,
-        amount: detail.amount,
+        amount: storedAmount,
         dueDate: detail.dueDate,
         consumption,
         details: JSON.stringify(detail.details),
+        // Numbers changed ⇒ previous insights are stale; regenerate on next ask.
+        suggestions: null,
       })
       .where(eq(schema.bills.id, existing.id))
       .run();
-    const row = { ...existing, details: detail.details, amount: detail.amount };
+    const row = { ...existing, details: detail.details, amount: storedAmount };
     return { ok: true, billId: existing.id, summary: renderBillSummary(row), isNew: false };
   }
 
@@ -141,7 +150,7 @@ export async function captureBill(
       billId: detail.billId,
       payId: detail.payId,
       utilityType: detail.utilityType,
-      amount: detail.amount,
+      amount: storedAmount,
       term: detail.term,
       dueDate: detail.dueDate,
       consumption,

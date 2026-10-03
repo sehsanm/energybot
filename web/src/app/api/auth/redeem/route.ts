@@ -22,9 +22,10 @@ export async function POST(req: Request): Promise<Response> {
     user: { id: user.id, displayName: user.displayName },
     csrf: signCsrf(sessionId),
   });
+  const secure = env.publicBaseUrl().startsWith("https://") ? "; Secure" : "";
   res.headers.append(
     "Set-Cookie",
-    `${USER_COOKIE}=${cookieValue}; Path=/; Max-Age=${USER_SESSION_DAYS * 86400}; HttpOnly; SameSite=Lax`,
+    `${USER_COOKIE}=${cookieValue}; Path=/; Max-Age=${USER_SESSION_DAYS * 86400}; HttpOnly; SameSite=Lax${secure}`,
   );
   return res;
 }
