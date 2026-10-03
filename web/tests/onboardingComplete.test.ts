@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { makeTestDb, now, schema } from "@/lib/db";
-import { markOnboarded, isOnboarded } from "@/lib/onboarding/complete";
-import { getProfileRow } from "@/lib/profile/parts";
+import { markOnboarded, isOnboarded, markOnboardingSkipped, isOnboardingSkipped } from "@/lib/onboarding/complete";
+import { getProfileRow, updateProfileParts } from "@/lib/profile/parts";
 import { emitAppEvent } from "@/lib/events";
 
 function seedUser(db: ReturnType<typeof makeTestDb>) {
@@ -34,6 +34,58 @@ describe("markOnboarded", () => {
     const db = makeTestDb();
     const uid = seedUser(db);
     expect(isOnboarded(getProfileRow(db, uid))).toBe(false); // no row at all
+  });
+});
+
+describe("markOnboardingSkipped", () => {
+  it("persists skippedAt exactly once (idempotent) without completing", () => {
+    const db = makeTestDb();
+    const uid = seedUser(db);
+    markOnboardingSkipped(db, uid);
+    const first = JSON.parse(getProfileRow(db, uid)!.behaviour).onboarding.skippedAt as number;
+    expect(first).toBeGreaterThan(0);
+    expect(isOnboarded(getProfileRow(db, uid))).toBe(false); // a skip is not a completion
+    markOnboardingSkipped(db, uid);
+    expect(JSON.parse(getProfileRow(db, uid)!.behaviour).onboarding.skippedAt).toBe(first); // first write wins
+  });
+
+  it("never overrides a completion, and completing after a skip supersedes it", () => {
+    const done = makeTestDb();
+    const doneUid = seedUser(done);
+    markOnboarded(done, doneUid, "app");
+    markOnboardingSkipped(done, doneUid); // no-op: completed users never "skip"
+    expect(JSON.parse(getProfileRow(done, doneUid)!.behaviour).onboarding.skippedAt).toBeUndefined();
+
+    const later = makeTestDb();
+    const laterUid = seedUser(later);
+    markOnboardingSkipped(later, laterUid);
+    markOnboarded(later, laterUid, "app");
+    const onb = JSON.parse(getProfileRow(later, laterUid)!.behaviour).onboarding;
+    expect(onb.completed).toBe(true); // completion wins…
+    expect(onb.skippedAt).toBeUndefined(); // …and replaces the skip wholesale
+    expect(isOnboardingSkipped(getProfileRow(later, laterUid))).toBe(false);
+    expect(isOnboarded(getProfileRow(later, laterUid))).toBe(true);
+  });
+
+  it("emits no event", () => {
+    const events: unknown[][] = [];
+    const spy = vi.spyOn(console, "log").mockImplementation((...a) => events.push(a));
+    const db = makeTestDb();
+    const uid = seedUser(db);
+    markOnboardingSkipped(db, uid);
+    expect(events.filter((e) => String(e[0]).includes("onboarding"))).toHaveLength(0);
+    spy.mockRestore();
+  });
+});
+
+describe("isOnboardingSkipped (the /api/me `skipped` derivation)", () => {
+  it("derives skipped from the profile row, orthogonal to completion", () => {
+    const db = makeTestDb();
+    const uid = seedUser(db);
+    expect(isOnboardingSkipped(getProfileRow(db, uid))).toBe(false); // no row at all
+    updateProfileParts(db, uid, { behaviour: { onboarding: { skippedAt: 1 } } });
+    expect(isOnboardingSkipped(getProfileRow(db, uid))).toBe(true);
+    expect(isOnboarded(getProfileRow(db, uid))).toBe(false); // skipped ≠ onboarded
   });
 });
 

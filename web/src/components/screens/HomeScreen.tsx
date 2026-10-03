@@ -35,6 +35,7 @@ interface BillJson {
 interface MeJson {
   user: { displayName: string | null };
   onboarded: boolean;
+  skipped: boolean;
 }
 
 export default function HomeScreen() {

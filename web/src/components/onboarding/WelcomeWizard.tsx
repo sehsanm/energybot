@@ -95,6 +95,7 @@ export function WelcomeWizard({ profile }: { profile: ProfileLike }) {
   const [backStack, setBackStack] = useState<number[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [skipBusy, setSkipBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [burst, setBurst] = useState(0);
   // Bodies of saves that have not been confirmed by the server yet. A ref (not
@@ -149,6 +150,25 @@ export function WelcomeWizard({ profile }: { profile: ProfileLike }) {
     });
     setBackStack((s) => [...s, stepIndex]);
     setStepIndex((i) => Math.min(i + 1, total - 1));
+  }
+
+  /**
+   * «بعداً»: persist the skip first — only a saved skip keeps /home from
+   * bouncing straight back here. A failed save keeps the user on the wizard
+   * with the error line instead of escaping into the redirect loop.
+   */
+  async function skip() {
+    if (skipBusy) return;
+    setSkipBusy(true);
+    setError(null);
+    try {
+      await api("/api/onboarding/skip", { method: "POST" });
+      router.replace("/home");
+    } catch {
+      setError(w.skipError);
+    } finally {
+      setSkipBusy(false);
+    }
   }
 
   async function finish() {
@@ -233,7 +253,8 @@ export function WelcomeWizard({ profile }: { profile: ProfileLike }) {
             <Button
               variant="outline"
               className="h-12 shrink-0 rounded-full px-5 font-bold"
-              onClick={() => router.replace("/home")}
+              onClick={skip}
+              disabled={skipBusy}
             >
               {w.skipBtn}
             </Button>

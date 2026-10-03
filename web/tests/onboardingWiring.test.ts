@@ -36,14 +36,21 @@ describe("onboarding wiring", () => {
     expect(profile).toMatch(/service_prefs/);
     expect(profile).toMatch(/behaviour:\s*\{\s*service_prefs/); // saved via PUT behaviour
   });
+
+  test("«بعداً» persists the skip server-side so /home does not bounce back", () => {
+    const wizard = readFileSync(join(root, "src/components/onboarding/WelcomeWizard.tsx"), "utf8");
+    expect(wizard).toMatch(/\/api\/onboarding\/skip/);
+  });
 });
 
 import { shouldRedirectToWelcome } from "@/lib/onboarding/shouldRedirectToWelcome";
 
 describe("shouldRedirectToWelcome", () => {
-  test("only un-onboarded, loaded sessions redirect — bot-completed users never do", () => {
-    expect(shouldRedirectToWelcome({ onboarded: false })).toBe(true);
-    expect(shouldRedirectToWelcome({ onboarded: true })).toBe(false); // bot-lite or app completions
+  test("only un-onboarded, un-skipped, loaded sessions redirect — everyone else stays", () => {
+    expect(shouldRedirectToWelcome({ onboarded: false, skipped: false })).toBe(true);
+    expect(shouldRedirectToWelcome({ onboarded: false, skipped: true })).toBe(false); // «بعداً» escape persists
+    expect(shouldRedirectToWelcome({ onboarded: true, skipped: false })).toBe(false); // bot-lite or app completions
+    expect(shouldRedirectToWelcome({ onboarded: true, skipped: true })).toBe(false); // stale skip after completion
     expect(shouldRedirectToWelcome(null)).toBe(false); // still loading / anon handled by gate
   });
 });
