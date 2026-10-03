@@ -181,7 +181,7 @@ describe("bot handler — bill capture", () => {
     const db = makeTestDb();
     const bot = new FakeBot();
     await handleBotUpdate(bot, textUpdate(13, "7742890001028"), db); // bad checksum
-    expect(bot.texts()).toEqual([copy.fallbackText]);
+    expect(bot.texts()).toEqual([copy.chatError]); // fell through to chat; AI unconfigured here
   });
 });
 
@@ -240,12 +240,12 @@ describe("bot handler — callbacks & commands", () => {
     expect(bot.texts()).toEqual([copy.webNotConfigured]);
   });
 
-  it("/bill sends the bill prompt and plain text falls back", async () => {
+  it("/bill sends the bill prompt; plain text goes to chat (AI unconfigured → friendly error)", async () => {
     const db = makeTestDb();
     const bot = new FakeBot();
     await handleBotUpdate(bot, textUpdate(22, "/bill"), db);
     await handleBotUpdate(bot, textUpdate(22, "سلام ربات!"), db);
     expect(bot.texts()[0]).toBe(copy.billPrompt);
-    expect(bot.texts()[1]).toBe(copy.fallbackText);
+    expect(bot.texts()[1]).toBe(copy.chatError); // no AI endpoint in this test env
   });
 });

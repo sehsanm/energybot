@@ -61,6 +61,7 @@ export default function AdminDashboard() {
         <h1 className="text-xl font-black">داشبورد مدیریت</h1>
         <div className="flex gap-3 text-sm">
           <Link href="/admin/users" className="font-bold text-[var(--accent)]">کاربران</Link>
+          <Link href="/admin/kb" className="font-bold text-[var(--accent)]">دانش‌نامه</Link>
           <button
             onClick={() => api("/api/auth/logout", { method: "POST" }).then(() => location.assign("/admin/login"))}
             className="text-[var(--muted)]"

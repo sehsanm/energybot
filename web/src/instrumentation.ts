@@ -28,6 +28,9 @@ export async function register(): Promise<void> {
   const { bootstrapAdmin } = await import("@/lib/admin/bootstrap");
   await bootstrapAdmin().catch((e) => console.error("[startup] admin bootstrap failed:", e));
 
+  const { ensureSeeded } = await import("@/lib/kb/repository");
+  ensureSeeded(db);
+
   const { Poller } = await import("@/lib/channels/poller");
   const { handleBotUpdate } = await import("@/lib/bot/handler");
   const { copy } = await import("@/content/copy");

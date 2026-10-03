@@ -342,7 +342,17 @@ export async function handleBotUpdate(
     if (!(e instanceof InvalidBillNumbersError)) throw e;
   }
 
-  // v1 has no free chat yet — point users at what works today.
-  await client.sendMessage(chatId, copy.fallbackText, appKeyboard() ? { keyboard: appKeyboard() } : undefined);
-  logMessage(db, user.id, client.channel, "bot", copy.fallbackText, { kind: "fallback" });
+  // Free chat (v2): grounded in the KB + user context.
+  let reply: string;
+  try {
+    const { answerChat, extractMemory } = await import("@/lib/chat/pipeline");
+    const res = await answerChat(user.id, text, db);
+    reply = res.reply;
+    logMessage(db, user.id, client.channel, "bot", reply, { kind: "chat" });
+    void extractMemory(user.id, text, reply, db).catch(() => undefined);
+  } catch (e) {
+    console.error("[bot] chat failed:", e);
+    reply = copy.chatError;
+  }
+  await client.sendMessage(chatId, reply);
 }

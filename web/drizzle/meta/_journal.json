@@ -15,6 +15,13 @@
       "when": 1791016620080,
       "tag": "0001_spooky_strong_guy",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791017590591,
+      "tag": "0002_absurd_spiral",
+      "breakpoints": true
     }
   ]
 }

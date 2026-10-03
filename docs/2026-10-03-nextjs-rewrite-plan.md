@@ -122,9 +122,9 @@ mini app in Telegram/Bale webviews, browser fallback. `web/README.md` covers run
 
 ## 9. Phase roadmap after v1
 
-| Phase | Contents |
-|---|---|
-| v2 | AI chat + KB (ported articles, simple semantic/keyword search), memory |
+| Phase | Contents | Status |
+|---|---|---|
+| v2 | AI chat + KB (ported articles, simple semantic/keyword search), memory | **shipped 2026-10-03** (FTS5-grounded chat on bots + web, admin KB editor, user memory) |
 | v3 | Duolingo-style mini courses (Persian, MCQ + calculators), gamification core (XP/streaks/badges/coins), Gemini TTS voice |
 | v4 | Nudge engine (memory + weather + news), admin-triggered campaigns |
 | v5 | Public SEO website surfaces (the Next app natively serves them), knowledge↔course↔site interlinking |

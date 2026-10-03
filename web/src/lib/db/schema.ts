@@ -133,3 +133,49 @@ export const auditLog = sqliteTable(
   },
   (t) => [index("ix_audit_created").on(t.createdAt)],
 );
+
+// --- v2: knowledge base + chat memory ------------------------------------
+
+export const kbArticles = sqliteTable("kb_articles", {
+  id: text("id").primaryKey(), // uuid
+  slug: text("slug").notNull().unique(),
+  title: text("title").notNull(),
+  bodyMd: text("body_md").notNull(),
+  category: text("category").notNull(),
+  tags: text("tags").notNull().default("[]"), // JSON array
+  status: text("status").notNull().default("published"), // draft | published
+  source: text("source").notNull().default("seed"), // seed | admin
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+
+export const kbChunks = sqliteTable(
+  "kb_chunks",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    articleId: text("article_id")
+      .notNull()
+      .references(() => kbArticles.id, { onDelete: "cascade" }),
+    chunkIndex: integer("chunk_index").notNull(),
+    text: text("text").notNull(),
+    textNormalized: text("text_normalized").notNull(),
+  },
+  (t) => [index("ix_kb_chunks_article").on(t.articleId)],
+);
+
+// Long-term user memory — 5 legacy categories, soft-deleted, ~40 cap.
+export const userMemories = sqliteTable(
+  "user_memories",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    category: text("category").notNull(), // preference | life_context | constraint | interaction_style | misc
+    text: text("text").notNull(),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+    deletedAt: integer("deleted_at"),
+  },
+  (t) => [index("ix_user_memories_user").on(t.userId, t.deletedAt)],
+);
