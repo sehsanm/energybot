@@ -11,6 +11,7 @@ import { generateSuggestions, renderSuggestions, targetsAsGoals } from "@/lib/bi
 import { parseBillNumbers, InvalidBillNumbersError } from "@/lib/billing/billNumbers";
 import { replaceGoalsForBill } from "@/lib/profile/goals";
 import { getProfileRow, updateProfileParts } from "@/lib/profile/parts";
+import { markOnboarded } from "@/lib/onboarding/complete";
 import { guardUploadBytes, MAX_UPLOAD_BYTES } from "@/lib/billing/upload";
 import type { BotClient } from "@/lib/channels/types";
 import { resolveUser } from "./identity";
@@ -172,6 +173,7 @@ export async function handleBotUpdate(
       const util = data.slice("onb:util:".length);
       updateProfileParts(db, user.id, { household: { main_utility: util } });
       setOnbStep(db, user.id, null);
+      markOnboarded(db, user.id, "bot"); // bot-lite counts as full completion
       const city = (JSON.parse(getProfileRow(db, user.id)?.household ?? "{}") as Record<string, unknown>).city ?? "شهرت";
       await client.sendMessage(chatId, copy.onboardingDone(String(city)) + "\n\n" + copy.billPrompt, appKeyboard() ? { keyboard: appKeyboard() } : undefined);
     }
@@ -301,6 +303,7 @@ export async function handleBotUpdate(
     const util = text.includes("گاز") ? "gas" : text.includes("برق") ? "electricity" : "both";
     updateProfileParts(db, user.id, { household: { main_utility: util } });
     setOnbStep(db, user.id, null);
+    markOnboarded(db, user.id, "bot"); // bot-lite counts as full completion
     const city = (JSON.parse(getProfileRow(db, user.id)?.household ?? "{}") as Record<string, unknown>).city ?? "شهرت";
     await client.sendMessage(chatId, copy.onboardingDone(String(city)) + "\n\n" + copy.billPrompt);
     return;

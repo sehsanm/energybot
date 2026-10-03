@@ -117,6 +117,36 @@ describe("bot handler — onboarding-lite", () => {
     expect(JSON.parse(profile.household).main_utility).toBe("gas");
   });
 
+  it("bot-lite callback completion sets the shared onboarding flag with source bot", async () => {
+    const db = makeTestDb();
+    const bot = new FakeBot();
+    await handleBotUpdate(bot, textUpdate(6, "/start"), db);
+    await handleBotUpdate(bot, textUpdate(6, "قم"), db);
+    await handleBotUpdate(bot, callbackUpdate(6, "onb:util:both"), db);
+    const { user } = resolveUser("bale", { externalId: "6" }, db);
+    const profile = db.select().from(schema.profiles).where(eq(schema.profiles.userId, user.id)).get()!;
+    expect(JSON.parse(profile.behaviour).onboarding).toEqual({
+      completed: true,
+      completedAt: expect.any(Number),
+      source: "bot",
+    });
+  });
+
+  it("bot-lite free-typed utility completion sets the shared onboarding flag with source bot", async () => {
+    const db = makeTestDb();
+    const bot = new FakeBot();
+    await handleBotUpdate(bot, textUpdate(7, "/start"), db);
+    await handleBotUpdate(bot, textUpdate(7, "سمنان"), db);
+    await handleBotUpdate(bot, textUpdate(7, "هر دو"), db);
+    const { user } = resolveUser("bale", { externalId: "7" }, db);
+    const profile = db.select().from(schema.profiles).where(eq(schema.profiles.userId, user.id)).get()!;
+    expect(JSON.parse(profile.behaviour).onboarding).toEqual({
+      completed: true,
+      completedAt: expect.any(Number),
+      source: "bot",
+    });
+  });
+
   it("/start after onboarding shows help", async () => {
     const db = makeTestDb();
     const bot = new FakeBot();
