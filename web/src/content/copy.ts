@@ -50,6 +50,82 @@ export const copy = {
     { command: "bill", description: "استعلام قبض" },
     { command: "web", description: "ورود به نسخهٔ وب" },
   ],
+  onboardingWizard: {
+    loading: "…در حال آماده‌سازی",
+    startBtn: "شروع کن 🚀",
+    skipBtn: "بعداً",
+    nextBtn: "ادامه",
+    confirmBtn: "تأیید",
+    backBtn: "بازگشت",
+    stepOf: (n: number, total: number) =>
+      `قدم ${n.toLocaleString("fa-IR")} از ${total.toLocaleString("fa-IR")}`,
+    saveError: "ذخیرهٔ این مرحله الان ممکن نشد؛ یک بار دیگه «ادامه» بزن. 🙏",
+    completeError: "تمام‌کردن مراحل الان ممکن نشد؛ دوباره «تأیید» بزن. 🙏",
+    welcome: {
+      title: "به دستیار انرژی خوش اومدی! 👋",
+      subtitle: "چند سؤال کوتاه جواب بده تا تحلیل‌ها و پیشنهادها دقیقاً مخصوص خونهٔ خودت بشه",
+      benefits: [
+        {
+          emoji: "💰",
+          title: "قبض کمتر",
+          desc: "قبض‌هات رو تحلیل می‌کنم و راه‌های صرفه‌جویی مخصوص خونهٔ خودت رو نشونت می‌دم",
+        },
+        {
+          emoji: "🎁",
+          title: "جایزه و پاداش",
+          desc: "با مصرف هوشمند امتیاز جمع کن و پاداش بگیر",
+        },
+        {
+          emoji: "🇮🇷",
+          title: "کمک به کشور",
+          desc: "مصرف کمتر یعنی برق و گاز بیشتر برای همه",
+        },
+      ],
+    },
+    home: {
+      prompt: "برای اینکه تحلیل‌ها دقیق‌تر بشه، اول از خونه‌ت برام بگو",
+      cityLabel: "شهر",
+      cityPlaceholder: "مثلاً تهران",
+      homeTypeLabel: "نوع منزل",
+      homeTypes: ["آپارتمان", "خانه ویلایی", "دیگر"],
+    },
+    occupants: {
+      prompt: "چند نفر توی خونه زندگی می‌کنید و خونه چقدر بزرگه؟",
+      occupantsLabel: "تعداد ساکنان",
+      areaLabel: "متراژ خونه (متر مربع)",
+    },
+    systems: {
+      prompt: "گرمایش و سرمایش خونه‌ت با چیه؟",
+      heatingLabel: "گرمایش",
+      heatingOptions: ["پکیج", "شوفاژ مرکزی", "بخاری گازی", "برقی", "نمی‌دانم"],
+      coolingLabel: "سرمایش",
+      coolingOptions: ["کولر آبی", "کولر گازی", "کولر پنجره‌ای", "نمی‌دانم"],
+      concernLabel: "بیشترین دغدغه‌ات کدوم قبضه؟",
+      concerns: { electricity: "برق ⚡", gas: "گاز 🔥", both: "هر دو" },
+    },
+    motivations: {
+      prompt: "چرا می‌خوای مصرف انرژی‌ت رو کم کنی؟",
+      hint: "حداقل یکی رو انتخاب کن",
+      emojis: { help_country: "🇮🇷", reduce_bill: "💰", earn_rewards: "🎁" },
+    },
+    toolbox: {
+      prompt: "چه کمک‌هایی رو می‌خوای ازم بگیری؟",
+      hint: "هیچ‌کدوم اجباری نیست؛ بعداً هم می‌تونی از پروفایل عوضش کنی",
+      emojis: {
+        daily_reminder: "⏰",
+        cost_suggestions: "💡",
+        reduce_help: "📉",
+        weekly_summary: "📊",
+        peak_alert: "⚡",
+        seasonal_tips: "🌱",
+      },
+    },
+    done: {
+      title: "تمومه! 🎉",
+      subtitle: "پروفایلت آماده‌ست؛ از این به بعد پیشنهادها و تحلیل‌ها دقیق‌تر می‌شن",
+      goHomeBtn: "بریم خانه",
+    },
+  },
 } as const;
 
 export const APP_NAME = "دستیار انرژی";
