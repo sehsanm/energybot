@@ -15,7 +15,7 @@ export class Poller {
     private readonly client: BotClient,
     private readonly pollTimeout: number,
     private readonly onUpdate: (update: Record<string, any>) => Promise<void>,
-    private readonly db: DB = (globalThis as any).__energybotDb ?? getDb(),
+    private readonly db: DB = getDb(),
   ) {}
 
   stop(): void {

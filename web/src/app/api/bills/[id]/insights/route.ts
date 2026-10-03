@@ -1,10 +1,11 @@
 // POST /api/bills/:id/insights — (re)generate insights for a bill.
 
 import { eq } from "drizzle-orm";
-import { getDb, now, schema } from "@/lib/db";
+import { getDb, schema } from "@/lib/db";
 import { badCsrf, csrfGuard, currentUser, unauth } from "@/lib/auth/api";
 import { priorBill } from "@/lib/billing/service";
 import { generateSuggestions, targetsAsGoals } from "@/lib/billing/suggestions";
+import { replaceGoalsForBill } from "@/lib/profile/goals";
 
 export const runtime = "nodejs";
 
@@ -30,15 +31,6 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   );
   if (!payload) return Response.json({ error: "generation failed" }, { status: 502 });
   db.update(schema.bills).set({ suggestions: JSON.stringify(payload) }).where(eq(schema.bills.id, id)).run();
-  appendGoals(db, user.id, targetsAsGoals(payload.targets, id));
+  replaceGoalsForBill(db, user.id, id, targetsAsGoals(payload.targets, id));
   return Response.json({ ok: true, suggestions: payload });
-}
-
-function appendGoals(db: ReturnType<typeof getDb>, userId: string, goals: Record<string, unknown>[]): void {
-  const row = db.select().from(schema.profiles).where(eq(schema.profiles.userId, userId)).get();
-  const existing: unknown[] = row ? JSON.parse(row.goals ?? "[]") : [];
-  db.update(schema.profiles)
-    .set({ goals: JSON.stringify([...existing, ...goals]), updatedAt: now() })
-    .where(eq(schema.profiles.userId, userId))
-    .run();
 }

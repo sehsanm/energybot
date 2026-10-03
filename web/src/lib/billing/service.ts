@@ -83,6 +83,7 @@ export async function captureBill(
   userId: string,
   input: { text?: string; imageBytes?: Buffer; pdfBytes?: Buffer },
   db: DB = getDb(),
+  finnotech: Pick<FinnotechClient, "inquireBill"> = clientFor(),
 ): Promise<CaptureResult> {
   const bn = await captureNumbers(input);
   if (!bn) {
@@ -95,7 +96,7 @@ export async function captureBill(
 
   let detail: BillDetail;
   try {
-    detail = await clientFor().inquireBill(bn.billId);
+    detail = await finnotech.inquireBill(bn.billId);
   } catch (err) {
     const msg = err instanceof FinnotechError ? err.message : String(err);
     console.warn("[billing] inquiry failed:", msg);

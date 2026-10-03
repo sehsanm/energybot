@@ -18,12 +18,12 @@ export async function bootstrapAdmin(db: DB = getDb()): Promise<void> {
   db.insert(schema.adminUsers)
     .values({
       id: randomUUID(),
-      email: bootstrapEmail,
+      email: bootstrapEmail.toLowerCase().trim(),
       passwordHash: await hashPassword(bootstrapPassword),
       createdAt: now(),
     })
     .run();
-  console.info(`[admin] bootstrapped ${bootstrapEmail}`);
+  console.info(`[admin] bootstrapped ${bootstrapEmail.toLowerCase().trim()}`);
 }
 
 export async function findAdminByEmail(email: string, db: DB = getDb()) {

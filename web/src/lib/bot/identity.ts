@@ -44,7 +44,21 @@ export function resolveUser(
         .get();
       return { user, identity: identity! };
     }
-    // Identity dangling without user (shouldn't happen) — fall through to recreate.
+    // Dangling identity without a user (user row lost, e.g. manual delete):
+    // re-point it at a fresh user instead of tripping the UNIQUE constraint below.
+    const userId = randomUUID();
+    db.insert(schema.users)
+      .values({ id: userId, displayName: ref.displayName ?? null, createdAt: t, lastSeenAt: t })
+      .run();
+    db.insert(schema.profiles).values({ userId, updatedAt: t }).run();
+    db.update(schema.userIdentities).set({ userId, lastSeenAt: t }).where(eq(schema.userIdentities.id, existing.id)).run();
+    const recreated = db.select().from(schema.users).where(eq(schema.users.id, userId)).get()!;
+    const identity = db
+      .select()
+      .from(schema.userIdentities)
+      .where(eq(schema.userIdentities.id, existing.id))
+      .get()!;
+    return { user: recreated, identity };
   }
 
   const userId = randomUUID();

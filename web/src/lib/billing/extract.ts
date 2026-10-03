@@ -105,9 +105,11 @@ export async function extractFromImage(imageBytes: Buffer): Promise<BillNumbers 
   let candidates = decodeAllOrientations(base.gray, base.width, base.height);
   let found = firstValidBillNumbers(candidates);
   if (found) return found;
-  // Small photos may not have enough pixels per bar — one 2x upscale retry.
-  if (base.width < 900) {
-    const up = await grayFromSharp(sharp(imageBytes).rotate().greyscale().resize({ width: base.width * 2 }));
+  // Small photos may not have enough pixels per bar — one 2x upscale retry on
+  // the long edge (covers portrait shots where the width alone looks tiny).
+  if (Math.min(base.width, base.height) < 900) {
+    const long = Math.max(base.width, base.height);
+    const up = await grayFromSharp(sharp(imageBytes).rotate().greyscale().resize({ width: long * 2 }));
     found = firstValidBillNumbers(decodeAllOrientations(up.gray, up.width, up.height));
   }
   return found;

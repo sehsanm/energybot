@@ -5,7 +5,8 @@ import { eq } from "drizzle-orm";
 import { getDb, now, schema } from "@/lib/db";
 import { badCsrf, csrfGuard, currentAdmin, unauth } from "@/lib/auth/api";
 import { priorBill } from "@/lib/billing/service";
-import { generateSuggestions, renderSuggestions } from "@/lib/billing/suggestions";
+import { generateSuggestions, renderSuggestions, targetsAsGoals } from "@/lib/billing/suggestions";
+import { replaceGoalsForBill } from "@/lib/profile/goals";
 import { deliverToUser } from "@/lib/channels/deliver";
 
 export const runtime = "nodejs";
@@ -29,6 +30,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   );
   if (!payload) return Response.json({ error: "generation failed" }, { status: 502 });
   db.update(schema.bills).set({ suggestions: JSON.stringify(payload) }).where(eq(schema.bills.id, id)).run();
+  replaceGoalsForBill(db, bill.userId, id, targetsAsGoals(payload.targets, id));
 
   let delivered: string[] = [];
   if (body.send) {

@@ -9,6 +9,7 @@ import { copy } from "@/content/copy";
 import { captureBill, priorBill } from "@/lib/billing/service";
 import { generateSuggestions, renderSuggestions, targetsAsGoals } from "@/lib/billing/suggestions";
 import { parseBillNumbers, InvalidBillNumbersError } from "@/lib/billing/billNumbers";
+import { replaceGoalsForBill } from "@/lib/profile/goals";
 import type { BotClient } from "@/lib/channels/types";
 import { resolveUser } from "./identity";
 
@@ -25,16 +26,14 @@ function getProfileRow(db: DB, userId: string) {
 function updateProfileParts(
   db: DB,
   userId: string,
-  parts: { household?: Record<string, unknown>; behaviour?: Record<string, unknown>; goalsAppend?: Record<string, unknown>[] },
+  parts: { household?: Record<string, unknown>; behaviour?: Record<string, unknown> },
 ): void {
   const row = getProfileRow(db, userId);
   const household = { ...JSON.parse(row?.household ?? "{}"), ...(parts.household ?? {}) };
   const behaviour = { ...JSON.parse(row?.behaviour ?? "{}"), ...(parts.behaviour ?? {}) };
-  let goals: unknown[] = JSON.parse(row?.goals ?? "[]");
-  if (parts.goalsAppend?.length) goals = [...goals, ...parts.goalsAppend];
   if (row) {
     db.update(schema.profiles)
-      .set({ household: JSON.stringify(household), behaviour: JSON.stringify(behaviour), goals: JSON.stringify(goals), updatedAt: now() })
+      .set({ household: JSON.stringify(household), behaviour: JSON.stringify(behaviour), updatedAt: now() })
       .where(eq(schema.profiles.userId, userId))
       .run();
   } else {
@@ -43,11 +42,24 @@ function updateProfileParts(
         userId,
         household: JSON.stringify(household),
         behaviour: JSON.stringify(behaviour),
-        goals: JSON.stringify(goals),
         updatedAt: now(),
       })
       .run();
   }
+}
+
+async function sendUtilityPrompt(client: BotClient, chatId: string): Promise<void> {
+  await client.sendMessage(chatId, copy.onboardingUtility, {
+    keyboard: {
+      inline: [
+        [
+          { text: "برق ⚡", callbackData: "onb:util:electricity" },
+          { text: "گاز 🔥", callbackData: "onb:util:gas" },
+        ],
+        [{ text: "هر دو 🙌", callbackData: "onb:util:both" }],
+      ],
+    },
+  });
 }
 
 function miniAppUrl(): string | null {
@@ -105,14 +117,14 @@ async function generateAndSendInsights(
     return false;
   }
   db.update(schema.bills).set({ suggestions: JSON.stringify(payload) }).where(eq(schema.bills.id, billRowId)).run();
-  updateProfileParts(db, userId, { goalsAppend: targetsAsGoals(payload.targets, billRowId) });
+  replaceGoalsForBill(db, userId, billRowId, targetsAsGoals(payload.targets, billRowId));
   await client.sendMessage(chatId, renderSuggestions(payload));
   logMessage(db, userId, client.channel, "bot", renderSuggestions(payload), { kind: "insights", billId: billRowId });
   return true;
 }
 
-function spawnInsights(client: BotClient, chatId: string, userId: string, billRowId: string): void {
-  void generateAndSendInsights(client, chatId, userId, billRowId).catch((e) =>
+function spawnInsights(client: BotClient, chatId: string, userId: string, billRowId: string, db: DB): void {
+  void generateAndSendInsights(client, chatId, userId, billRowId, db).catch((e) =>
     console.error("[bot] insights task failed:", e),
   );
 }
@@ -144,13 +156,16 @@ async function runCapture(
   logMessage(db, userId, client.channel, "bot", res.summary, { kind: "bill_capture", billId: res.billId });
   // Insights go out as a follow-up message; the summary reply is not delayed on the LLM.
   await client.sendMessage(chatId, copy.insightsPending);
-  spawnInsights(client, chatId, userId, res.billId);
+  spawnInsights(client, chatId, userId, res.billId, db);
 }
 
 // --- Update entry ------------------------------------------------------------
 
-export async function handleBotUpdate(client: BotClient, update: Record<string, any>): Promise<void> {
-  const db = getDb();
+export async function handleBotUpdate(
+  client: BotClient,
+  update: Record<string, any>,
+  db: DB = getDb(),
+): Promise<void> {
   const msg = update.message ?? update.edited_message;
   const cb = update.callback_query;
 
@@ -158,11 +173,15 @@ export async function handleBotUpdate(client: BotClient, update: Record<string, 
     await client.answerCallback(String(cb.id)); // 10-second rule: answer first
     const chatId = String(cb.message?.chat?.id ?? cb.from?.id ?? "");
     if (!chatId) return;
-    const { user } = resolveUser(client.channel, {
-      externalId: String(cb.from.id),
-      displayName: cb.from.first_name,
-      username: cb.from.username,
-    });
+    const { user } = resolveUser(
+      client.channel,
+      {
+        externalId: String(cb.from.id),
+        displayName: cb.from.first_name,
+        username: cb.from.username,
+      },
+      db,
+    );
     const data = String(cb.data ?? "");
     if (data.startsWith("insights:")) {
       await generateAndSendInsights(client, chatId, user.id, data.slice("insights:".length), db);
@@ -178,11 +197,15 @@ export async function handleBotUpdate(client: BotClient, update: Record<string, 
 
   if (!msg?.from) return;
   const chatId = String(msg.chat?.id ?? msg.from.id);
-  const { user } = resolveUser(client.channel, {
-    externalId: String(msg.from.id),
-    displayName: msg.from.first_name,
-    username: msg.from.username,
-  });
+  const { user } = resolveUser(
+    client.channel,
+    {
+      externalId: String(msg.from.id),
+      displayName: msg.from.first_name,
+      username: msg.from.username,
+    },
+    db,
+  );
   await client.sendChatAction(chatId);
 
   // Bill photo (take the largest size).
@@ -227,7 +250,18 @@ export async function handleBotUpdate(client: BotClient, update: Record<string, 
   // Commands.
   const [cmd] = text.split(/\s+/, 1);
   if (cmd === "/start") {
-    if (!onbStep(db, user.id) && !(JSON.parse(getProfileRow(db, user.id)?.household ?? "{}") as Record<string, unknown>).city) {
+    // /start on an in-progress onboarding re-sends the pending step (legacy parity).
+    const step = onbStep(db, user.id);
+    if (step === "city") {
+      await client.sendMessage(chatId, copy.onboardingCity);
+      return;
+    }
+    if (step === "utility") {
+      await sendUtilityPrompt(client, chatId);
+      return;
+    }
+    const city = (JSON.parse(getProfileRow(db, user.id)?.household ?? "{}") as Record<string, unknown>).city;
+    if (!city) {
       setOnbStep(db, user.id, "city");
       await client.sendMessage(chatId, copy.intro + "\n\n" + copy.onboardingCity);
       return;
@@ -264,17 +298,7 @@ export async function handleBotUpdate(client: BotClient, update: Record<string, 
     const city = text.replace(/\s+/g, " ").slice(0, 60);
     updateProfileParts(db, user.id, { household: { city } });
     setOnbStep(db, user.id, "utility");
-    await client.sendMessage(chatId, copy.onboardingUtility, {
-      keyboard: {
-        inline: [
-          [
-            { text: "برق ⚡", callbackData: "onb:util:electricity" },
-            { text: "گاز 🔥", callbackData: "onb:util:gas" },
-          ],
-          [{ text: "هر دو 🙌", callbackData: "onb:util:both" }],
-        ],
-      },
-    });
+    await sendUtilityPrompt(client, chatId);
     return;
   }
   if (step === "utility") {

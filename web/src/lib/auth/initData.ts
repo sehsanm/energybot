@@ -54,7 +54,7 @@ export function validateInitData(
   } catch {
     user = null;
   }
-  if (!user || (user.id === undefined && user.id !== 0)) return { ok: false, error: "no_user" };
+  if (!user || user.id === undefined || user.id === null) return { ok: false, error: "no_user" };
   return { ok: true, data: { user, authDate } };
 }
 
