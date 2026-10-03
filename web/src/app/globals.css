@@ -1,35 +1,163 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-/* Theme variables — host themeParams (Telegram/Bale mini app) land here, so
-   the host theme and the app's own palette coexist. Temporary neutral palette
-   until the Stitch design pass replaces it. */
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Design tokens — shadcn/ui CSS-variable theme (single source of truth).
+ * Values below are PLACEHOLDERS (emerald primary + neutral base) until the
+ * Stitch design pass replaces them; host themeParams (Telegram/Bale mini app)
+ * override these same variables at runtime.
+ */
 :root {
-  --bg: #f8fafc;
-  --surface: #ffffff;
-  --fg: #0f172a;
-  --muted: #64748b;
-  --accent: #059669;
-  --accent-fg: #ffffff;
-  --warning: #d97706;
-  --border: #e2e8f0;
+  --background: oklch(0.985 0.002 120);
+  --foreground: oklch(0.19 0.02 155);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.19 0.02 155);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.19 0.02 155);
+  /* Energy-green anchor (placeholder #059669) — Stitch pass finalizes the ramp */
+  --primary: oklch(0.596 0.13 163);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.955 0.01 150);
+  --secondary-foreground: oklch(0.24 0.02 155);
+  --muted: oklch(0.955 0.005 150);
+  --muted-foreground: oklch(0.5 0.02 155);
+  --accent: oklch(0.94 0.03 155);
+  --accent-foreground: oklch(0.24 0.02 155);
+  --destructive: oklch(0.577 0.245 27.325);
+  --warning: oklch(0.71 0.16 55);
+  --border: oklch(0.91 0.01 150);
+  --input: oklch(0.91 0.01 150);
+  --ring: oklch(0.596 0.13 163);
+  --chart-1: oklch(0.596 0.13 163);
+  --chart-2: oklch(0.71 0.16 55);
+  --chart-3: oklch(0.5 0.02 155);
+  --chart-4: oklch(0.35 0.02 155);
+  --chart-5: oklch(0.24 0.02 155);
+  --radius: 0.75rem;
+  --sidebar: oklch(0.985 0.002 120);
+  --sidebar-foreground: oklch(0.19 0.02 155);
+  --sidebar-primary: oklch(0.596 0.13 163);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.94 0.03 155);
+  --sidebar-accent-foreground: oklch(0.24 0.02 155);
+  --sidebar-border: oklch(0.91 0.01 150);
+  --sidebar-ring: oklch(0.596 0.13 163);
 }
 
 .dark {
-  --bg: #0b1220;
-  --surface: #111a2c;
-  --fg: #e2e8f0;
-  --muted: #94a3b8;
-  --accent: #10b981;
-  --accent-fg: #06281c;
-  --warning: #f59e0b;
-  --border: #1e293b;
+  --background: oklch(0.17 0.015 160);
+  --foreground: oklch(0.93 0.01 150);
+  --card: oklch(0.21 0.018 160);
+  --card-foreground: oklch(0.93 0.01 150);
+  --popover: oklch(0.21 0.018 160);
+  --popover-foreground: oklch(0.93 0.01 150);
+  /* Energy-green anchor (placeholder #10b981) */
+  --primary: oklch(0.696 0.15 163);
+  --primary-foreground: oklch(0.2 0.04 165);
+  --secondary: oklch(0.27 0.02 158);
+  --secondary-foreground: oklch(0.93 0.01 150);
+  --muted: oklch(0.27 0.015 158);
+  --muted-foreground: oklch(0.7 0.015 150);
+  --accent: oklch(0.3 0.03 158);
+  --accent-foreground: oklch(0.93 0.01 150);
+  --destructive: oklch(0.704 0.191 22.216);
+  --warning: oklch(0.79 0.16 65);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.696 0.15 163);
+  --chart-1: oklch(0.696 0.15 163);
+  --chart-2: oklch(0.79 0.16 65);
+  --chart-3: oklch(0.7 0.015 150);
+  --chart-4: oklch(0.55 0.02 150);
+  --chart-5: oklch(0.4 0.02 150);
+  --sidebar: oklch(0.21 0.018 160);
+  --sidebar-foreground: oklch(0.93 0.01 150);
+  --sidebar-primary: oklch(0.696 0.15 163);
+  --sidebar-primary-foreground: oklch(0.2 0.04 165);
+  --sidebar-accent: oklch(0.3 0.03 158);
+  --sidebar-accent-foreground: oklch(0.93 0.01 150);
+  --sidebar-border: oklch(1 0 0 / 12%);
+  --sidebar-ring: oklch(0.696 0.15 163);
+}
+
+/* Legacy token aliases — pre-shadcn pages keep rendering until each is
+   retrofitted to the shadcn classes. Host theming sets the shadcn variables,
+   so both naming schemes stay in sync automatically. --accent intentionally
+   points at --primary (legacy pages used it as the brand accent); the retrofit
+   replaces these usages with shadcn's accent semantics. */
+:root,
+.dark {
+  --bg: var(--background);
+  --surface: var(--card);
+  --fg: var(--foreground);
+  --muted: var(--muted-foreground);
+  --accent: var(--primary);
+  --accent-fg: var(--primary-foreground);
 }
 
 html {
   font-family: Vazirmatn, "Segoe UI", Tahoma, "Iranian Sans", sans-serif;
 }
 
-body {
-  background: var(--bg);
-  color: var(--fg);
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-warning: var(--warning);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  html {
+    @apply font-sans;
+  }
 }

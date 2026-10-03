@@ -27,6 +27,7 @@ gamification (celebrations, streaks, progress).
 | Typography | Vazirmatn bundled locally (next/font/local); no CDN font dependency |
 | Routing change | Public landing at `/` (anonymous), dashboard moves to `/home`; session gate redirects signed-in users |
 | Implementation | Presentation-layer only: tokens → component kit → per-screen retrofit; zero page-logic rewrites |
+| Component library | **Tailwind + shadcn/ui** (user decision, 2026-10-03): shadcn provides the base primitives (Button, Card, Input, Tabs, Dialog, Table, Badge, Progress, Switch, Select, Skeleton, Avatar…); custom kit only for what it lacks (ScreenHeader, BottomNav, MessageBubble, StreakFlame, Confetti). Stitch tokens land in shadcn's CSS-variable theme (oklch), which the host `themeParams` mapping overrides as today. shadcn components rely on logical CSS properties where available; RTL specifics get patched per component during retrofit. |
 
 ## 3. Deliverables
 
@@ -39,9 +40,10 @@ gamification (celebrations, streaks, progress).
    (green anchor + neutrals + semantic), radii scale, spacing, type scale,
    shadows, motion curves — replacing the current placeholder variables,
    keeping host-theme mapping intact.
-4. **Component kit** (`src/components/kit/`): Button (bouncy), Card,
-   ScreenHeader, Stat, ProgressBar, BottomNav, MessageBubble, EmptyState,
-   StreakFlame, Confetti trigger.
+4. **Component layer**: shadcn/ui base (init + primitives installed and themed
+   via the token layer) + `src/components/kit/` for the app-specific pieces
+   only: ScreenHeader, BottomNav, MessageBubble, EmptyState, StreakFlame,
+   Confetti.
 5. **Retrofitted pages**: all user pages, admin pages, new landing page.
 6. **Bundle font + reduced-motion support.**
 

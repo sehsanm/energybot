@@ -32,9 +32,12 @@ pages.
   must be grounded in real screens + data (RTL Persian, ~390px) per the
   2026-10-01 spec §8 discipline. Fallback only by explicit user agreement.
 - **Retheme tokens only vs component kit**: tokens alone can't carry a playful
-  personality (shapes, shadows, motion); decision = tokens **plus** a small
-  component kit (Button, Card, ScreenHeader, Stat, ProgressBar, BottomNav,
-  MessageBubble, Confetti/StreakFlame hooks).
+  personality (shapes, shadows, motion); decision = tokens **plus** a component
+  kit. **Component library (user decision, 2026-10-03): Tailwind + shadcn/ui**
+  as the base — same stack as the legacy admin console; shadcn's CSS-variable
+  theming lands in the same variables the host themeParams map onto. The custom
+  kit shrinks to what shadcn doesn't ship: ScreenHeader, StreakFlame, Confetti,
+  MessageBubble, BottomNav (mini-app nav), plus per-screen compositions.
 - **Where the landing page lives**: the Next app owns `/` today (dashboard).
   Decision: dashboard moves to `/app`… no — simpler: **public landing at `/`
   for anonymous visitors, dashboard at `/home`** for signed-in users (redirect

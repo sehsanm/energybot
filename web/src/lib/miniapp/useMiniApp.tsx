@@ -68,13 +68,14 @@ function applyTheme(webApp: WebAppLike | null, scheme: "light" | "dark"): void {
   root.classList.toggle("dark", scheme === "dark");
   const tp = webApp?.themeParams;
   if (!tp) return;
+  // themeParams → shadcn token variables (legacy aliases follow automatically).
   const map: [string, string][] = [
-    ["--bg", tp.bg_color ?? ""],
-    ["--surface", tp.secondary_bg_color ?? tp.bg_color ?? ""],
-    ["--fg", tp.text_color ?? ""],
-    ["--muted", tp.hint_color ?? ""],
-    ["--accent", tp.button_color ?? ""],
-    ["--accent-fg", tp.button_text_color ?? ""],
+    ["--background", tp.bg_color ?? ""],
+    ["--card", tp.secondary_bg_color ?? tp.bg_color ?? ""],
+    ["--foreground", tp.text_color ?? ""],
+    ["--muted-foreground", tp.hint_color ?? ""],
+    ["--primary", tp.button_color ?? ""],
+    ["--primary-foreground", tp.button_text_color ?? ""],
     ["--border", tp.secondary_bg_color ?? ""],
   ];
   for (const [cssVar, value] of map) if (value) root.style.setProperty(cssVar, value);

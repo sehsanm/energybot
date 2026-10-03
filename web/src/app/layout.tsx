@@ -2,6 +2,10 @@ import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import "./globals.css";
 import { MiniAppProvider } from "@/lib/miniapp/useMiniApp";
+import { Geist } from "next/font/google";
+import { cn } from "@/lib/utils";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
   title: "دستیار انرژی",
@@ -16,7 +20,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fa" dir="rtl">
+    <html lang="fa" dir="rtl" className={cn("font-sans", geist.variable)}>
       <body className="min-h-dvh antialiased">
         {/* Mini-app host bridges: the page must load these itself — hosts do not
             inject them. Telegram defines window.Telegram.WebApp, Bale window.Bale.WebApp.
