@@ -14,4 +14,9 @@ describe("onboarding wiring", () => {
     expect(page).toContain("SessionGate");
     expect(page).toContain("WelcomeWizard");
   });
+
+  test("/welcome feeds behaviour into the wizard draft so resume skips answered steps (spec §6)", () => {
+    const page = readFileSync(join(root, "src/app/welcome/page.tsx"), "utf8");
+    expect(page).toMatch(/behaviour\s*:/); // passed into setProfile, not dropped
+  });
 });

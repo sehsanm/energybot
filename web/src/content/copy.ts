@@ -108,6 +108,16 @@ export const copy = {
       hint: "حداقل یکی رو انتخاب کن",
       emojis: { help_country: "🇮🇷", reduce_bill: "💰", earn_rewards: "🎁" },
     },
+    firstBill: {
+      prompt: "اگه یه قبض برق یا گاز دم دستته، شناسه‌ش رو بنویس یا عکسش رو بفرست",
+      inputPlaceholder: "شناسه قبض",
+      queryBtn: "استعلام",
+      orDivider: "یا",
+      fileBtn: "عکس یا PDF قبض",
+      skipBtn: "فعلاً رد کن",
+      billLabel: "قبض",
+      advancingHint: "ثبت شد! یه لحظه… می‌رم قدم بعد",
+    },
     toolbox: {
       prompt: "چه کمک‌هایی رو می‌خوای ازم بگیری؟",
       hint: "هیچ‌کدوم اجباری نیست؛ بعداً هم می‌تونی از پروفایل عوضش کنی",

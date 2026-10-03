@@ -25,12 +25,12 @@ function WelcomeLoader() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      // GET /api/profile does not return behaviour (and /api/me only exposes
-      // the onboarded flag), so the draft starts from the household alone —
-      // behaviour questions simply get re-asked on resume.
+      // Both parts feed the draft so resume skips answered steps: household
+      // (city…main_concern) and behaviour (motivations, service_prefs —
+      // spec §6 resume, readProfile returns it alongside household).
       const [meRes, profileRes] = await Promise.allSettled([
         api<{ onboarded: boolean }>("/api/me"),
-        api<{ household?: Record<string, unknown> }>("/api/profile"),
+        api<{ household?: Record<string, unknown>; behaviour?: Record<string, unknown> }>("/api/profile"),
       ]);
       if (cancelled) return;
       if (meRes.status === "fulfilled" && meRes.value.onboarded) {
@@ -39,6 +39,7 @@ function WelcomeLoader() {
       }
       setProfile({
         household: profileRes.status === "fulfilled" ? profileRes.value.household ?? {} : {},
+        behaviour: profileRes.status === "fulfilled" ? profileRes.value.behaviour ?? {} : {},
       });
       setReady(true);
     })();

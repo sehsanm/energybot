@@ -41,12 +41,16 @@ import { OccupantsStep } from "./steps/OccupantsStep";
 import { SystemsStep } from "./steps/SystemsStep";
 import { MotivationsStep } from "./steps/MotivationsStep";
 import { ToolboxStep } from "./steps/ToolboxStep";
+import { FirstBillStep } from "./steps/FirstBillStep";
 
 /** Contract every draft-editing step receives. */
 export interface StepProps {
   draft: OnboardingDraft;
   setDraft: React.Dispatch<React.SetStateAction<OnboardingDraft>>;
   valid: boolean;
+  /** Only first_bill uses this: its capture-success auto-advance and skip
+   *  button advance the wizard themselves (the step saves nothing to PUT). */
+  onDone?: () => void;
 }
 
 /**
@@ -61,7 +65,10 @@ function startIndex(draft: OnboardingDraft): number {
   return Math.max(ONBOARDING_STEPS.findIndex((s) => s.key === key), 1);
 }
 
-function renderStep(key: OnboardingStepKey, props: StepProps): React.ReactNode {
+function renderStep(
+  key: OnboardingStepKey,
+  props: StepProps & { onDone: () => void },
+): React.ReactNode {
   switch (key) {
     case "welcome":
       return <WelcomeStep />;
@@ -74,8 +81,7 @@ function renderStep(key: OnboardingStepKey, props: StepProps): React.ReactNode {
     case "motivations":
       return <MotivationsStep {...props} />;
     case "first_bill":
-      // Task 7 mounts FirstBillStep here (index 5) — inline bill capture.
-      return null;
+      return <FirstBillStep {...props} />;
     case "toolbox":
       return <ToolboxStep {...props} />;
   }
@@ -216,7 +222,9 @@ export function WelcomeWizard({ profile }: { profile: ProfileLike }) {
         </div>
       </header>
 
-      <main className="flex-1 px-4 pb-4 pt-2">{renderStep(step.key, { draft, setDraft, valid })}</main>
+      <main className="flex-1 px-4 pb-4 pt-2">
+        {renderStep(step.key, { draft, setDraft, valid, onDone: goNext })}
+      </main>
 
       <footer className="sticky bottom-0 z-10 border-t border-[var(--border)] bg-[var(--background)]/90 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur">
         {error && <p className="pb-2 text-center text-xs font-bold text-[var(--warning)]">{error}</p>}

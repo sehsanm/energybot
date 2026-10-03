@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { makeTestDb, now, schema } from "@/lib/db";
-import { applyProfileUpdate } from "@/lib/profile/apiUpdate";
+import { applyProfileUpdate, readProfile } from "@/lib/profile/apiUpdate";
 import { getProfileRow } from "@/lib/profile/parts";
 
 function seedUser(db: ReturnType<typeof makeTestDb>) {
@@ -34,5 +34,30 @@ describe("applyProfileUpdate", () => {
     applyProfileUpdate(db, uid, { behaviour: { onboarding: { completed: true } } as never });
     const b = JSON.parse(getProfileRow(db, uid)!.behaviour);
     expect(b.onboarding).toBeUndefined(); // completion only via markOnboarded
+  });
+});
+
+describe("readProfile", () => {
+  it("returns empty household/behaviour and no goals for a user with no profile row", () => {
+    const db = makeTestDb();
+    const uid = seedUser(db);
+    const p = readProfile(db, uid);
+    expect(p.household).toEqual({});
+    expect(p.behaviour).toEqual({});
+    expect(p.goals).toEqual([]);
+  });
+
+  it("returns behaviour so the wizard resume draft sees motivations/service_prefs (spec §6)", () => {
+    const db = makeTestDb();
+    const uid = seedUser(db);
+    applyProfileUpdate(db, uid, {
+      city: "تهران",
+      behaviour: { motivations: ["reduce_bill"], service_prefs: ["weekly_summary"] },
+    });
+    const p = readProfile(db, uid);
+    expect(p.household.city).toBe("تهران");
+    expect(p.behaviour.motivations).toEqual(["reduce_bill"]);
+    expect(p.behaviour.service_prefs).toEqual(["weekly_summary"]);
+    expect(p.goals).toEqual([]);
   });
 });

@@ -1,20 +1,16 @@
 // GET/PUT /api/profile — household basics that feed bill insights.
 
-import { eq } from "drizzle-orm";
-import { getDb, schema } from "@/lib/db";
+import { getDb } from "@/lib/db";
 import { badCsrf, csrfGuard, unauth, currentUser } from "@/lib/auth/api";
-import { applyProfileUpdate } from "@/lib/profile/apiUpdate";
+import { applyProfileUpdate, readProfile } from "@/lib/profile/apiUpdate";
 
 export const runtime = "nodejs";
 
 export async function GET(): Promise<Response> {
   const user = await currentUser();
   if (!user) return unauth();
-  const row = getDb().select().from(schema.profiles).where(eq(schema.profiles.userId, user.id)).get();
-  return Response.json({
-    household: row ? JSON.parse(row.household) : {},
-    goals: row ? JSON.parse(row.goals ?? "[]") : [],
-  });
+  // household + goals (ProfileScreen) and behaviour (wizard resume, spec §6).
+  return Response.json(readProfile(getDb(), user.id));
 }
 
 export async function PUT(req: Request): Promise<Response> {

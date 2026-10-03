@@ -49,6 +49,24 @@ const behaviourPart = (body: Record<string, unknown>): Record<string, unknown> |
   return out;
 };
 
+/**
+ * GET /api/profile response body, extracted for unit testing: every stored
+ * part parsed, with absent parts (or no row yet) as empty objects/arrays.
+ * `behaviour` is included so the onboarding wizard's resume draft sees
+ * motivations/service_prefs (spec §6) instead of re-asking them.
+ */
+export function readProfile(
+  db: DB,
+  userId: string,
+): { household: Record<string, unknown>; behaviour: Record<string, unknown>; goals: unknown[] } {
+  const row = getProfileRow(db, userId);
+  return {
+    household: JSON.parse(row?.household ?? "{}") as Record<string, unknown>,
+    behaviour: JSON.parse(row?.behaviour ?? "{}") as Record<string, unknown>,
+    goals: JSON.parse(row?.goals ?? "[]") as unknown[],
+  };
+}
+
 export function applyProfileUpdate(
   db: DB,
   userId: string,
