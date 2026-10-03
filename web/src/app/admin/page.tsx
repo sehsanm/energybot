@@ -1,23 +1,15 @@
 "use client";
 
-// Admin dashboard (dashboard-mock language): stat cards + channel split + audit tail.
+// Admin dashboard (dashboard-mock language): stat cards + charts + audit tail.
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Users, Activity, Receipt, Lightbulb, MessageSquare } from "lucide-react";
 import { AdminShell } from "@/components/admin/AdminShell";
+import { ChannelDonut, WeekBars } from "@/components/admin/charts";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/client/api";
-
-interface Stats {
-  usersTotal: number;
-  usersActive: number;
-  billsTotal: number;
-  insightsCount: number;
-  messages7d: number;
-  byChannel: { channel: string; n: number }[];
-}
+import type { StatsResult } from "@/lib/admin/queries";
 
 interface AuditEntry {
   id: number;
@@ -32,12 +24,12 @@ function fa(n: number): string {
 }
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState<Stats | null>(null);
+  const [stats, setStats] = useState<StatsResult | null>(null);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
   const [denied, setDenied] = useState(false);
 
   useEffect(() => {
-    api<Stats>("/api/admin/stats").then(setStats).catch(() => setDenied(true));
+    api<StatsResult>("/api/admin/stats").then(setStats).catch(() => setDenied(true));
     api<{ entries: AuditEntry[] }>("/api/admin/audit").then((d) => setAudit(d.entries)).catch(() => {});
   }, []);
 
@@ -63,7 +55,7 @@ export default function AdminDashboard() {
     : [];
 
   return (
-    <AdminShell title="داشبورد مدیریت">
+    <AdminShell title="داشبورد مدیریت" crumbs={[{ label: "داشبورد" }]}>
       <div className="mx-auto max-w-5xl space-y-6">
         {/* Stat cards */}
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
@@ -93,19 +85,26 @@ export default function AdminDashboard() {
               ))}
         </div>
 
-        {/* Channel split */}
-        {stats && stats.byChannel.length > 0 && (
-          <Card>
-            <CardContent className="flex flex-wrap items-center gap-3 px-4 py-4 text-sm">
-              <span className="font-bold">تقسیم کانال‌ها:</span>
-              {stats.byChannel.map((c) => (
-                <Badge key={c.channel} variant="secondary" className="gap-1 rounded-md">
-                  {c.channel === "bale" ? "بله" : "تلگرام"}
-                  <span dir="ltr">{fa(Number(c.n))}</span>
-                </Badge>
-              ))}
-            </CardContent>
-          </Card>
+        {/* Charts */}
+        {stats && (
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardContent className="space-y-3 px-4 py-4">
+                <h2 className="text-sm font-black">تقسیم کانال‌ها</h2>
+                {stats.byChannel.length > 0 ? (
+                  <ChannelDonut data={stats.byChannel} />
+                ) : (
+                  <p className="text-sm text-[var(--muted-foreground)]">هویتی ثبت نشده است.</p>
+                )}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="space-y-3 px-4 py-4">
+                <h2 className="text-sm font-black">پیام‌های ۷ روز اخیر</h2>
+                <WeekBars data={stats.messagesByDay} />
+              </CardContent>
+            </Card>
+          </div>
         )}
 
         {/* Audit tail */}

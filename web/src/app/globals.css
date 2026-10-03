@@ -34,6 +34,10 @@
   /* Amber for streaks/rewards (Duolingo-style flame) */
   --streak: oklch(0.766 0.16 70);
   --streak-foreground: oklch(0.29 0.06 55);
+  /* Chart categorical pair (dataviz-validated): Bale=emerald, Telegram=amber.
+     Light pair validated on #ffffff; dark pair on the dark card surface. */
+  --chart-bale: #059669;
+  --chart-telegram: #f59e0b;
   --border: oklch(0.91 0.02 158);
   --input: oklch(0.91 0.02 158);
   --ring: oklch(0.596 0.13 163);
@@ -74,6 +78,9 @@
   --warning: oklch(0.795 0.155 70);
   --streak: oklch(0.795 0.155 72);
   --streak-foreground: oklch(0.25 0.05 55);
+  /* Dark chart pair: mid-lightness steps (dataviz dark band L 0.48–0.67). */
+  --chart-bale: #059669;
+  --chart-telegram: #d97706;
   --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 16%);
   --ring: oklch(0.696 0.15 163);
@@ -109,6 +116,8 @@ html {
   --color-sidebar: var(--sidebar);
   --color-streak-foreground: var(--streak-foreground);
   --color-streak: var(--streak);
+  --color-chart-bale: var(--chart-bale);
+  --color-chart-telegram: var(--chart-telegram);
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
   --color-chart-3: var(--chart-3);

@@ -88,7 +88,7 @@ export default function AdminUserDetail() {
 
   if (!d) {
     return (
-      <AdminShell title="جزئیات کاربر">
+      <AdminShell title="جزئیات کاربر" crumbs={[{ label: "داشبورد", href: "/admin" }, { label: "کاربران", href: "/admin/users" }, { label: "…" }]}>
         <p className="p-8 text-center text-sm text-[var(--muted-foreground)]">{status ?? "…در حال بارگذاری"}</p>
       </AdminShell>
     );
@@ -99,6 +99,7 @@ export default function AdminUserDetail() {
   return (
     <AdminShell
       title={name}
+      crumbs={[{ label: "داشبورد", href: "/admin" }, { label: "کاربران", href: "/admin/users" }, { label: name }]}
       action={
         <Button
           variant={d.user.isBlocked ? "default" : "outline"}
@@ -157,7 +158,7 @@ export default function AdminUserDetail() {
         </Card>
 
         <Tabs defaultValue="bills">
-          <TabsList className="rounded-lg">
+          <TabsList className="justify-start rounded-lg">
             <TabsTrigger value="bills" className="rounded-md text-xs font-bold">
               قبض‌ها ({d.bills.length.toLocaleString("fa-IR")})
             </TabsTrigger>

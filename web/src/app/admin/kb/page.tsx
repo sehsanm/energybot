@@ -58,7 +58,7 @@ export default function AdminKbPage() {
   }
 
   return (
-    <AdminShell title="دانش‌نامه">
+    <AdminShell title="دانش‌نامه" crumbs={[{ label: "داشبورد", href: "/admin" }, { label: "دانش‌نامه" }]}>
       <div className="mx-auto max-w-5xl space-y-4">
         {status && <p className="text-xs text-[var(--muted-foreground)]">{status}</p>}
         {articles === null ? (

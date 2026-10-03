@@ -7,12 +7,14 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { AdminShell } from "@/components/admin/AdminShell";
+import { MarkdownView } from "@/components/admin/MarkdownView";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/client/api";
 
 interface Article {
@@ -63,7 +65,7 @@ export default function AdminKbEditPage() {
 
   if (!a) {
     return (
-      <AdminShell title="ویرایش مقاله">
+      <AdminShell title="ویرایش مقاله" crumbs={[{ label: "داشبورد", href: "/admin" }, { label: "دانش‌نامه", href: "/admin/kb" }, { label: "…" }]}>
         <p className="p-8 text-center text-sm text-[var(--muted-foreground)]">{status ?? "…در حال بارگذاری"}</p>
       </AdminShell>
     );
@@ -71,7 +73,8 @@ export default function AdminKbEditPage() {
 
   return (
     <AdminShell
-      title="ویرایش مقاله"
+      title={a.title}
+      crumbs={[{ label: "داشبورد", href: "/admin" }, { label: "دانش‌نامه", href: "/admin/kb" }, { label: "ویرایش" }]}
       action={
         <Button variant="ghost" size="sm" className="rounded-lg text-xs" asChild>
           <Link href="/admin/kb">← فهرست مقاله‌ها</Link>
@@ -109,16 +112,36 @@ export default function AdminKbEditPage() {
                 />
               </div>
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-bold">متن (Markdown)</Label>
-              <Textarea
-                value={a.bodyMd}
-                onChange={(e) => setA({ ...a, bodyMd: e.target.value })}
-                rows={18}
-                dir="rtl"
-                className="rounded-lg font-mono text-xs leading-6"
-              />
-            </div>
+
+            {/* Body: rendered preview first, raw markdown on the edit tab */}
+            <Tabs defaultValue="preview">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-bold">متن مقاله</Label>
+                <TabsList className="justify-start rounded-lg">
+                  <TabsTrigger value="preview" className="rounded-md text-xs font-bold">
+                    پیش‌نمایش
+                  </TabsTrigger>
+                  <TabsTrigger value="edit" className="rounded-md text-xs font-bold">
+                    ویرایش Markdown
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+              <TabsContent value="preview" className="mt-2">
+                <div className="min-h-40 rounded-lg border border-[var(--border)] bg-[var(--background)] px-4 py-3">
+                  <MarkdownView md={a.bodyMd} />
+                </div>
+              </TabsContent>
+              <TabsContent value="edit" className="mt-2">
+                <Textarea
+                  value={a.bodyMd}
+                  onChange={(e) => setA({ ...a, bodyMd: e.target.value })}
+                  rows={18}
+                  dir="rtl"
+                  className="rounded-lg font-mono text-xs leading-6"
+                />
+              </TabsContent>
+            </Tabs>
+
             <div className="flex items-center gap-2">
               <Switch
                 id="kb-published"

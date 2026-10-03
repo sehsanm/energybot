@@ -21,10 +21,13 @@ function logout() {
 
 export function AdminShell({
   title,
+  crumbs,
   action,
   children,
 }: {
   title: string;
+  /** Breadcrumb trail (RTL: management root on the right); last item is the current page. */
+  crumbs?: { label: string; href?: string }[];
   action?: React.ReactNode;
   children: React.ReactNode;
 }) {
@@ -88,9 +91,27 @@ export function AdminShell({
           </button>
         </nav>
 
-        <header className="flex items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--card)]/60 px-6 py-3">
-          <h1 className="text-base font-black">{title}</h1>
-          {action}
+        <header className="border-b border-[var(--border)] bg-[var(--card)]/60 px-6 py-3">
+          {crumbs && crumbs.length > 0 && (
+            <nav aria-label="مسیر" className="mb-1 flex items-center gap-1 text-[11px] text-[var(--muted-foreground)]">
+              {crumbs.map((c, i) => (
+                <span key={i} className="flex items-center gap-1">
+                  {i > 0 && <span aria-hidden>›</span>}
+                  {c.href ? (
+                    <Link href={c.href} className="transition-colors hover:text-[var(--foreground)]">
+                      {c.label}
+                    </Link>
+                  ) : (
+                    <span>{c.label}</span>
+                  )}
+                </span>
+              ))}
+            </nav>
+          )}
+          <div className="flex items-center justify-between gap-3">
+            <h1 className="text-base font-black">{title}</h1>
+            {action}
+          </div>
         </header>
 
         <main className="flex-1 p-6">{children}</main>
