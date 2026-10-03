@@ -126,7 +126,7 @@ mini app in Telegram/Bale webviews, browser fallback. `web/README.md` covers run
 |---|---|---|
 | v2 | AI chat + KB (ported articles, simple semantic/keyword search), memory | **shipped 2026-10-03** (FTS5-grounded chat on bots + web, admin KB editor, user memory) |
 | v2.5 | **UI redesign implementation** (Stitch): tokens → shadcn theme → kit → retrofit all pages; landing at `/`, dashboard at `/home`; embedded `MemoryRouter`; admin screens via Stitch then retrofit | **in flight** — user-app screens generated & **gate 1 approved 2026-10-03**; implementation ahead; admin screens pending |
-| v2.6 | **In-app onboarding wizard** — rebuild the legacy 7-step wizard (motivations, toolbox, service prefs, first bill) as an in-app multi-step flow; replaces bot onboarding-lite for new users; feeds personalization + v3 gamification | decided 2026-10-03 (user: in-app wizard) |
+| v2.6 | **In-app onboarding wizard** — rebuilt as a 7-step /welcome flow (welcome, household ×3, motivations, first-bill inline capture, toolbox) with skip-as-escape, resume from profile, shared completion flag (app or bot-lite), queue-and-resend saves; spec `docs/superpowers/specs/2026-10-03-v2.6-onboarding-wizard-design.md` | **shipped 2026-10-03** (walkthrough-verified; bot-lite keeps its chat flow, either completes) |
 | v3 | Duolingo-style mini courses (Persian, MCQ + calculators), gamification core (XP/streaks/badges/coins), Gemini TTS voice | after v2.6 (consumes the design kit + onboarding motivations) |
 | v4 | Nudge engine (memory + weather + news), admin-triggered campaigns | |
 | v5 | Public SEO website surfaces (the Next app natively serves them), knowledge↔course↔site interlinking; legacy Python archival after the switch is confirmed | |
