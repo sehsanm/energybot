@@ -1,9 +1,14 @@
 "use client";
 
-// Chat screen: assistant grounded in the KB + user context.
+// Chat screen (Stitch 02-chat): kit bubbles, typing indicator, pill input.
 
 import { useEffect, useRef, useState } from "react";
-import { AppShell, Card } from "@/components/AppShell";
+import { SendHorizonal, Zap } from "lucide-react";
+import { AppShell } from "@/components/AppShell";
+import { ScreenHeader } from "@/components/kit/ScreenHeader";
+import { MessageBubble } from "@/components/kit/MessageBubble";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { api } from "@/lib/client/api";
 
 interface Msg {
@@ -11,6 +16,8 @@ interface Msg {
   content: string;
   createdAt: number;
 }
+
+const SUGGESTIONS = ["ساعت اوج مصرف چه زمانی است؟", "چطور قبض گازم را کم کنم؟"];
 
 export default function ChatScreen() {
   const [messages, setMessages] = useState<Msg[] | null>(null);
@@ -26,17 +33,17 @@ export default function ChatScreen() {
   }, []);
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, busy]);
 
-  async function send() {
-    const t = text.trim();
-    if (!t || busy) return;
+  async function send(t?: string) {
+    const val = (t ?? text).trim();
+    if (!val || busy) return;
     setBusy(true);
     setError(null);
-    setMessages((m) => [...(m ?? []), { role: "user", content: t, createdAt: Date.now() }]);
+    setMessages((m) => [...(m ?? []), { role: "user", content: val, createdAt: Date.now() }]);
     setText("");
     try {
-      const r = await api<{ reply: string }>("/api/chat", { method: "POST", body: { text: t } });
+      const r = await api<{ reply: string }>("/api/chat", { method: "POST", body: { text: val } });
       setMessages((m) => [...(m ?? []), { role: "assistant", content: r.reply, createdAt: Date.now() }]);
     } catch (e) {
       setError((e as Error).message);
@@ -47,38 +54,58 @@ export default function ChatScreen() {
 
   return (
     <AppShell>
-      <div className="flex h-[calc(100dvh-8.5rem)] flex-col gap-3">
-        <h1 className="text-xl font-black">گفتگو 💬</h1>
-        <Card className="flex-1 overflow-y-auto">
+      <div className="flex h-[calc(100dvh-10rem)] flex-col gap-3">
+        <ScreenHeader
+          title="گفتگو"
+          subtitle="دستیار متخصص صرفه‌جویی برق و گاز"
+          trailing={
+            <div className="grid size-9 place-items-center rounded-full bg-[var(--primary)] text-[var(--primary-foreground)]">
+              <Zap className="size-4" aria-hidden />
+            </div>
+          }
+        />
+
+        <div className="flex-1 space-y-3 overflow-y-auto pb-1">
           {messages === null ? (
-            <p className="text-sm text-[var(--muted)]">…در حال بارگذاری</p>
+            <p className="pt-8 text-center text-sm text-[var(--muted-foreground)]">…در حال بارگذاری</p>
           ) : messages.length === 0 ? (
-            <div className="space-y-2 text-sm leading-7 text-[var(--muted)]">
-              <p>سلام! 👋 دربارهٔ صرفه‌جویی برق و گاز هرچه می‌دانی بپرس.</p>
-              <p>مثلاً: «ساعت اوج مصرف چه زمانی‌هاست؟» یا «چطور قبض گازم رو کم کنم؟»</p>
+            <div className="space-y-4 pt-6 text-center">
+              <div className="text-4xl">👋</div>
+              <p className="text-sm font-bold">سلام! هرچه دربارهٔ صرفه‌جویی برق و گاز می‌دانی بپرس.</p>
+              <div className="flex flex-wrap justify-center gap-2">
+                {SUGGESTIONS.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => send(s)}
+                    className="rounded-full border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-xs text-[var(--muted-foreground)] transition-colors hover:text-[var(--foreground)]"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
             </div>
           ) : (
-            <div className="space-y-3">
+            <>
               {messages.map((m, i) => (
-                <div
-                  key={i}
-                  className={
-                    m.role === "user"
-                      ? "mr-auto max-w-[85%] rounded-2xl bg-[var(--accent)] px-3 py-2 text-sm text-[var(--accent-fg)]"
-                      : "ml-auto max-w-[85%] rounded-2xl bg-[var(--bg)] px-3 py-2 text-sm leading-6"
-                  }
-                >
-                  {m.content}
-                </div>
+                <MessageBubble key={i} role={m.role} content={m.content} />
               ))}
-              {busy && <div className="ml-auto animate-pulse text-xs text-[var(--muted)]">…در حال نوشتن</div>}
-              <div ref={bottomRef} />
-            </div>
+              {busy && (
+                <div className="ml-auto flex items-center gap-1 rounded-full bg-[var(--card)] px-3 py-2 shadow-sm">
+                  <span className="size-1.5 animate-bounce rounded-full bg-[var(--muted-foreground)] [animation-delay:0ms]" />
+                  <span className="size-1.5 animate-bounce rounded-full bg-[var(--muted-foreground)] [animation-delay:150ms]" />
+                  <span className="size-1.5 animate-bounce rounded-full bg-[var(--muted-foreground)] [animation-delay:300ms]" />
+                </div>
+              )}
+            </>
           )}
-        </Card>
+          <div ref={bottomRef} />
+        </div>
+
         {error && <p className="text-xs text-[var(--warning)]">{error}</p>}
+
         <div className="flex gap-2">
-          <input
+          <Input
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
@@ -88,15 +115,16 @@ export default function ChatScreen() {
               }
             }}
             placeholder="سؤالت را بنویس…"
-            className="flex-1 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none focus:border-[var(--accent)]"
+            className="h-12 flex-1 rounded-full bg-[var(--card)] px-5"
           />
-          <button
-            onClick={send}
+          <Button
+            className="size-12 shrink-0 rounded-full p-0"
+            onClick={() => send()}
             disabled={busy || !text.trim()}
-            className="rounded-xl bg-[var(--accent)] px-4 text-sm font-bold text-[var(--accent-fg)] disabled:opacity-50"
+            aria-label="ارسال"
           >
-            ارسال
-          </button>
+            <SendHorizonal className="size-5 -scale-x-100" aria-hidden />
+          </Button>
         </div>
       </div>
     </AppShell>

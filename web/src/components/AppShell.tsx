@@ -1,61 +1,38 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useUserNav } from "@/lib/nav/UserNav";
-import { USER_SCREENS } from "@/lib/nav/userNav";
+// User-app shell: content column + floating pill bottom nav (kit).
+
+import { BottomNav } from "@/components/kit/BottomNav";
+import { Button } from "@/components/ui/button";
+import { Card as ShadcnCard, CardContent } from "@/components/ui/card";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const { screen, embedded, go } = useUserNav();
-
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col bg-[var(--bg)]">
-      <main className="flex-1 px-4 pb-24 pt-6">{children}</main>
-      <nav className="fixed inset-x-0 bottom-0 z-10 border-t border-[var(--border)] bg-[var(--surface)]">
-        <div className="mx-auto flex w-full max-w-lg items-stretch justify-around">
-          {USER_SCREENS.map((item) => {
-            // Embedded: memory navigation (no pushState — Bale iframe).
-            // Browser: real routes, deep links keep working.
-            const active = embedded ? screen === item.key : pathname === item.href;
-            const cls = `flex flex-1 flex-col items-center gap-1 py-2.5 text-xs transition-colors ${
-              active ? "font-bold text-[var(--accent)]" : "text-[var(--muted)]"
-            }`;
-            return embedded ? (
-              <button key={item.key} type="button" onClick={() => go(item.key)} className={cls}>
-                <span className="text-lg leading-none">{item.icon}</span>
-                {item.label}
-              </button>
-            ) : (
-              <Link key={item.key} href={item.href} className={cls}>
-                <span className="text-lg leading-none">{item.icon}</span>
-                {item.label}
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
+    <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col bg-[var(--background)]">
+      <main className="flex-1 px-4 pb-28 pt-4">{children}</main>
+      <BottomNav />
     </div>
   );
 }
 
+/** Compat wrappers (pre-kit screens) over shadcn primitives. */
 export function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm ${className}`}>
-      {children}
-    </div>
+    <ShadcnCard className={`gap-0 py-4 ${className}`}>
+      <CardContent className="px-4">{children}</CardContent>
+    </ShadcnCard>
   );
 }
 
 export function PrimaryButton(
   props: React.ButtonHTMLAttributes<HTMLButtonElement> & { loading?: boolean },
 ) {
-  const { loading, ...rest } = props;
+  const { loading, className = "", ...rest } = props;
   return (
-    <button
+    <Button
       {...rest}
       disabled={rest.disabled || loading}
-      className="w-full rounded-xl bg-[var(--accent)] px-4 py-3 font-bold text-[var(--accent-fg)] transition-opacity disabled:opacity-50"
+      className={`h-12 w-full rounded-full text-base font-black ${className}`}
     />
   );
 }

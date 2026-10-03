@@ -8,3 +8,5 @@ data/
 .env.local
 drizzle/meta/_journal.json.bak
 web/tsconfig.tsbuildinfo
+.shots/
+tsconfig.tsbuildinfo

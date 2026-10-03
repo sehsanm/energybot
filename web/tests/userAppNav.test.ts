@@ -86,4 +86,10 @@ describe("routing wiring (landing at /, dashboard at /home)", () => {
     expect(copy.landing.ctaBale).toBeTruthy();
     expect(copy.landing.ctaTelegram).toBeTruthy();
   });
+
+  test("post-login redirects land on the app, not the public landing", () => {
+    const page = readFileSync(join(root, "src/app/login/page.tsx"), "utf8");
+    expect(page).toContain('"/home"');
+    expect(page).not.toMatch(/router\.replace\("\/"\)/);
+  });
 });

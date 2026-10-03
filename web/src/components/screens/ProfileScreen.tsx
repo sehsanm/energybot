@@ -1,9 +1,15 @@
 "use client";
 
-// Profile screen: household basics that feed insight quality.
+// Profile screen (Stitch 04-profile): household form + goals.
 
 import { useEffect, useState } from "react";
-import { AppShell, Card, PrimaryButton } from "@/components/AppShell";
+import { UserRound } from "lucide-react";
+import { AppShell } from "@/components/AppShell";
+import { ScreenHeader } from "@/components/kit/ScreenHeader";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { api } from "@/lib/client/api";
 
 const FIELDS: { key: string; label: string; placeholder?: string; numeric?: boolean }[] = [
@@ -46,41 +52,64 @@ export default function ProfileScreen() {
 
   return (
     <AppShell>
+      <ScreenHeader
+        title="پروفایل خانوار"
+        subtitle="این اطلاعات تحلیل قبض‌ها را دقیق‌تر می‌کند"
+        trailing={
+          <div className="grid size-9 place-items-center rounded-full bg-[var(--secondary)] text-[var(--secondary-foreground)]">
+            <UserRound className="size-4" aria-hidden />
+          </div>
+        }
+      />
       <div className="space-y-4">
-        <h1 className="text-xl font-black">پروفایل خانوار</h1>
-        <p className="text-xs leading-6 text-[var(--muted)]">
-          این اطلاعات تحلیل قبض‌ها را دقیق‌تر می‌کند (مثلاً مصرف به ازای هر نفر یا هر مترمربع).
-        </p>
         {loaded ? (
-          <Card className="space-y-3">
-            {FIELDS.map((f) => (
-              <label key={f.key} className="block">
-                <span className="mb-1 block text-sm font-bold">{f.label}</span>
-                <input
-                  value={values[f.key] ?? ""}
-                  onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
-                  placeholder={f.placeholder}
-                  inputMode={f.numeric ? "numeric" : "text"}
-                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2.5 text-sm outline-none focus:border-[var(--accent)]"
-                />
-              </label>
-            ))}
-            <PrimaryButton onClick={save} loading={busy}>
-              ذخیره
-            </PrimaryButton>
-            {saved && <p className="text-center text-xs text-[var(--accent)]">ذخیره شد ✅</p>}
+          <Card>
+            <CardContent className="space-y-3 px-4">
+              {FIELDS.map((f) => (
+                <div key={f.key} className="space-y-1.5">
+                  <Label className="text-xs font-bold">{f.label}</Label>
+                  <Input
+                    value={values[f.key] ?? ""}
+                    onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
+                    placeholder={f.placeholder}
+                    inputMode={f.numeric ? "numeric" : "text"}
+                    className="h-11 rounded-2xl"
+                  />
+                </div>
+              ))}
+              <Button
+                className="h-12 w-full rounded-full text-base font-black"
+                onClick={save}
+                disabled={busy}
+              >
+                ذخیره
+              </Button>
+              {saved && (
+                <p className="text-center text-xs font-bold text-[var(--primary)]">ذخیره شد ✅</p>
+              )}
+            </CardContent>
           </Card>
         ) : (
-          <Card>…در حال بارگذاری</Card>
-        )}
-        {goals.length > 0 && (
           <Card>
-            <h2 className="mb-2 font-bold">🎯 هدف‌های من</h2>
-            <ul className="list-inside list-disc space-y-1 text-sm leading-6">
-              {goals.map((g, i) => (
-                <li key={i}>{g.text}</li>
-              ))}
-            </ul>
+            <CardContent className="py-8 text-center text-sm text-[var(--muted-foreground)]">
+              …در حال بارگذاری
+            </CardContent>
+          </Card>
+        )}
+
+        {goals.length > 0 && (
+          <Card className="bg-[var(--secondary)]/60">
+            <CardContent className="space-y-2 px-4">
+              <h2 className="font-black">🎯 هدف‌های من</h2>
+              <ul className="space-y-2 text-sm leading-6">
+                {goals.map((g, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="mt-2 size-1.5 shrink-0 rounded-full bg-[var(--primary)]" />
+                    {g.text}
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
           </Card>
         )}
       </div>
