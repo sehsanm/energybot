@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+/* Theme variables — host themeParams (Telegram/Bale mini app) land here, so
+   the host theme and the app's own palette coexist. Temporary neutral palette
+   until the Stitch design pass replaces it. */
+:root {
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --fg: #0f172a;
+  --muted: #64748b;
+  --accent: #059669;
+  --accent-fg: #ffffff;
+  --warning: #d97706;
+  --border: #e2e8f0;
+}
+
+.dark {
+  --bg: #0b1220;
+  --surface: #111a2c;
+  --fg: #e2e8f0;
+  --muted: #94a3b8;
+  --accent: #10b981;
+  --accent-fg: #06281c;
+  --warning: #f59e0b;
+  --border: #1e293b;
+}
+
+html {
+  font-family: Vazirmatn, "Segoe UI", Tahoma, "Iranian Sans", sans-serif;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+}
