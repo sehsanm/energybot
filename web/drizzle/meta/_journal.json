@@ -22,6 +22,13 @@
       "when": 1791017590591,
       "tag": "0002_absurd_spiral",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1791098878602,
+      "tag": "0003_outgoing_absorbing_man",
+      "breakpoints": true
     }
   ]
 }

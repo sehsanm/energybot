@@ -143,6 +143,12 @@ export const kbArticles = sqliteTable("kb_articles", {
   bodyMd: text("body_md").notNull(),
   category: text("category").notNull(),
   tags: text("tags").notNull().default("[]"), // JSON array
+  utility: text("utility"), // "electricity" | "gas" | "both" — nullable (legacy rows)
+  difficulty: text("difficulty"), // "starter" | "medium" | "deep"
+  minutes: integer("minutes"), // reading time
+  sources: text("sources"), // JSON array of "name — detail/URL"
+  objectives: text("objectives"), // JSON array (Persian)
+  keyFacts: text("key_facts"), // JSON array (Persian, quiz-able)
   status: text("status").notNull().default("published"), // draft | published
   source: text("source").notNull().default("seed"), // seed | admin
   createdAt: integer("created_at").notNull(),
