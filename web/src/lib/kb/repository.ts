@@ -154,17 +154,9 @@ export function saveArticle(db: DB, input: SaveArticleInput): typeof schema.kbAr
   return db.select().from(schema.kbArticles).where(eq(schema.kbArticles.id, id)).get()!;
 }
 
-/** Seed from the content dir when the KB is empty. Idempotent by design. */
-export function ensureSeeded(db: DB = getDb(), dirs: string[] = seedDirs()): number {
-  ensureFts(db);
-  const any = db.select({ id: schema.kbArticles.id }).from(schema.kbArticles).limit(1).get();
-  if (any) return 0;
-  const dir = dirs.find((d) => fs.existsSync(d));
-  if (!dir) {
-    console.warn("[kb] no seed directory found; KB starts empty");
-    return 0;
-  }
-  let count = 0;
+let bootReconciled = false;
+
+function filesToInputs(dir: string): { slug: string; input: SaveArticleInput }[] {
   const files: string[] = [];
   const walk = (d: string) => {
     for (const e of fs.readdirSync(d, { withFileTypes: true })) {
@@ -173,23 +165,59 @@ export function ensureSeeded(db: DB = getDb(), dirs: string[] = seedDirs()): num
     }
   };
   walk(dir);
-  files.sort();
-  for (const f of files) {
+  return files.sort().map((f) => {
     const fm = parseFrontmatter(fs.readFileSync(f, "utf-8"), path.basename(f, ".md"));
-    if (!fm.body.trim()) continue;
-    saveArticle(db, {
+    return {
       slug: path.basename(f, ".md"),
-      title: fm.title || path.basename(f, ".md"),
-      bodyMd: fm.body,
-      category: fm.category,
-      tags: fm.tags,
-      status: "published",
-      source: "seed",
-    });
-    count++;
+      input: {
+        slug: path.basename(f, ".md"), title: fm.title || path.basename(f, ".md"), bodyMd: fm.body,
+        category: fm.category, tags: fm.tags, status: "published" as const, source: "seed" as const,
+        utility: fm.utility, difficulty: fm.difficulty, minutes: fm.minutes,
+        sources: fm.sources, objectives: fm.objectives, keyFacts: fm.keyFacts,
+      },
+    };
+  });
+}
+
+/**
+ * Boot-time reconciler: inserts new seed files, updates changed seed rows
+ * (re-chunk + re-index via saveArticle), skips admin-edited rows, and deletes
+ * seed rows whose file is gone (FTS rows dropped first, chunks cascade).
+ * Returns the count of newly inserted articles. Default-dir calls reconcile
+ * once per process (bootReconciled); explicit dirs always reconcile.
+ */
+export function ensureSeeded(db: DB = getDb(), dirs?: string[]): number {
+  ensureFts(db);
+  if (dirs === undefined && bootReconciled) return 0;
+  const searchDirs = dirs ?? seedDirs();
+  const dir = searchDirs.find((d) => fs.existsSync(d));
+  if (!dir) { console.warn("[kb] no seed directory found; KB starts empty"); return 0; }
+  const entries = filesToInputs(dir);
+  const fileSlugs = new Set(entries.map((e) => e.slug));
+  let inserted = 0;
+  for (const { slug, input } of entries) {
+    const existing = db.select().from(schema.kbArticles).where(eq(schema.kbArticles.slug, slug)).get();
+    if (!existing) { saveArticle(db, input); inserted++; continue; }
+    if (existing.source === "admin") continue;
+    const changed =
+      existing.title !== input.title || existing.bodyMd !== input.bodyMd ||
+      existing.category !== input.category ||
+      existing.tags !== JSON.stringify(input.tags ?? []) ||
+      existing.utility !== (input.utility ?? null) || existing.difficulty !== (input.difficulty ?? null) ||
+      existing.minutes !== (input.minutes ?? null) ||
+      existing.sources !== (input.sources ? JSON.stringify(input.sources) : null) ||
+      existing.objectives !== (input.objectives ? JSON.stringify(input.objectives) : null) ||
+      existing.keyFacts !== (input.keyFacts ? JSON.stringify(input.keyFacts) : null);
+    if (changed) saveArticle(db, input);
   }
-  console.info(`[kb] seeded ${count} articles from ${dir}`);
-  return count;
+  const seeds = db.select().from(schema.kbArticles).all().filter((r) => r.source === "seed");
+  for (const row of seeds) {
+    if (fileSlugs.has(row.slug)) continue;
+    dropIndex(db, row.id);
+    db.delete(schema.kbArticles).where(eq(schema.kbArticles.id, row.id)).run();
+  }
+  if (dirs === undefined) bootReconciled = true;
+  return inserted;
 }
 
 /** bm25 search over published chunks. Returns [] on no usable terms. */
