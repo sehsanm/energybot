@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { makeTestDb } from "@/lib/db";
-import { ensureSeeded, listArticles, saveArticle, searchKb } from "@/lib/kb/repository";
+import { ensureSeeded, listArticles, normalizeArticleRow, saveArticle, searchKb } from "@/lib/kb/repository";
 
 let tmp = "";
 afterEach(() => { if (tmp) fs.rmSync(tmp, { recursive: true, force: true }); tmp = ""; });
@@ -67,5 +67,25 @@ describe("seed reconciliation", () => {
     ensureSeeded(db, [d]);
     expect(ensureSeeded(db, [d])).toBe(0);
     expect(listArticles(db)).toHaveLength(1);
+  });
+
+  it("scalar metadata removed from the file is cleared and the row converges", () => {
+    const db = makeTestDb();
+    const withMeta = `---\ntitle: مقاله 9\ncategory: bills\ntags: ["الف"]\nutility: gas\ndifficulty: deep\nminutes: 9\n---\n# متن مقاله دربارهٔ مصرف برق\n`;
+    const d = dirWith({ "bills/09-u.md": withMeta });
+    ensureSeeded(db, [d]);
+    const seeded = listArticles(db).find((x) => x.article.slug === "09-u")!.article;
+    expect(seeded.utility).toBe("gas"); expect(seeded.difficulty).toBe("deep"); expect(seeded.minutes).toBe(9);
+
+    fs.writeFileSync(path.join(d, "bills/09-u.md"), ART(9), "utf-8"); // metadata lines dropped
+    ensureSeeded(db, [d]);
+    const row = listArticles(db).find((x) => x.article.slug === "09-u")!.article;
+    expect(row.utility).toBe(null); expect(row.difficulty).toBe(null); expect(row.minutes).toBe(null);
+    const view = normalizeArticleRow(row); // cleared fields read back with legacy defaults
+    expect(view.utility).toBe("both"); expect(view.difficulty).toBe("starter"); expect(view.minutes).toBe(4);
+
+    expect(ensureSeeded(db, [d])).toBe(0);
+    const again = listArticles(db).find((x) => x.article.slug === "09-u")!.article;
+    expect(again.updatedAt).toBe(row.updatedAt); // converged — the third run writes nothing
   });
 });

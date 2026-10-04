@@ -54,9 +54,10 @@ export interface SaveArticleInput {
   tags?: string[];
   status?: "draft" | "published";
   source?: "seed" | "admin";
-  utility?: "electricity" | "gas" | "both";
-  difficulty?: "starter" | "medium" | "deep";
-  minutes?: number;
+  /** Scalars: undefined preserves the stored value on update; null clears it. */
+  utility?: "electricity" | "gas" | "both" | null;
+  difficulty?: "starter" | "medium" | "deep" | null;
+  minutes?: number | null;
   sources?: string[];
   objectives?: string[];
   keyFacts?: string[];
@@ -115,9 +116,9 @@ export function saveArticle(db: DB, input: SaveArticleInput): typeof schema.kbAr
         tags: JSON.stringify(input.tags ?? []),
         status: input.status ?? existing.status,
         source: input.source ?? existing.source,
-        utility: input.utility ?? existing.utility,
-        difficulty: input.difficulty ?? existing.difficulty,
-        minutes: input.minutes ?? existing.minutes,
+        utility: input.utility === undefined ? existing.utility : input.utility,
+        difficulty: input.difficulty === undefined ? existing.difficulty : input.difficulty,
+        minutes: input.minutes === undefined ? existing.minutes : input.minutes,
         sources: input.sources !== undefined ? JSON.stringify(input.sources) : existing.sources,
         objectives: input.objectives !== undefined ? JSON.stringify(input.objectives) : existing.objectives,
         keyFacts: input.keyFacts !== undefined ? JSON.stringify(input.keyFacts) : existing.keyFacts,
@@ -172,7 +173,7 @@ function filesToInputs(dir: string): { slug: string; input: SaveArticleInput }[]
       input: {
         slug: path.basename(f, ".md"), title: fm.title || path.basename(f, ".md"), bodyMd: fm.body,
         category: fm.category, tags: fm.tags, status: "published" as const, source: "seed" as const,
-        utility: fm.utility, difficulty: fm.difficulty, minutes: fm.minutes,
+        utility: fm.utility ?? null, difficulty: fm.difficulty ?? null, minutes: fm.minutes ?? null,
         sources: fm.sources, objectives: fm.objectives, keyFacts: fm.keyFacts,
       },
     };
