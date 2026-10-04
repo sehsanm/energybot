@@ -76,3 +76,42 @@ describe("parseFrontmatter", () => {
     expect(fm.tags).toEqual(["الف", "ب", "ج"]);
   });
 });
+
+describe("parseFrontmatter metadata fields", () => {
+  const RAW = `---
+title: کاهش مصرف کولر گازی
+category: cooling
+tags: ["کولر گازی", "تابستان"]
+utility: electricity
+difficulty: starter
+minutes: 4
+sources: ["ساتبا — sagp.ir", "توانیر — تعرفه ۱۴۰۴"]
+objectives: ["تنظیم دمای کولر", "چک‌لیست نگهداری"]
+keyFacts: ["هر یک درجه پایین‌تر ≈ ۷ تا ۱۰ درصد مصرف بیشتر", "اینورتر تا ۴۰ درصد کم‌مصرف‌تر است"]
+---
+# بدنه`;
+  it("parses all six new fields (JSON-array form)", () => {
+    const fm = parseFrontmatter(RAW, "fallback");
+    expect(fm.utility).toBe("electricity");
+    expect(fm.difficulty).toBe("starter");
+    expect(fm.minutes).toBe(4);
+    expect(fm.sources).toHaveLength(2);
+    expect(fm.objectives).toEqual(["تنظیم دمای کولر", "چک‌لیست نگهداری"]);
+    expect(fm.keyFacts![0]).toContain("۷ تا ۱۰ درصد");
+  });
+  it("accepts comma lists like tags do", () => {
+    const fm = parseFrontmatter(`---\ntitle: x\nsources: الف, ب\nobjectives: ج, د, ه\nkeyFacts: ی, ک\n---\nb`, "t");
+    expect(fm.sources).toEqual(["الف", "ب"]);
+    expect(fm.objectives).toHaveLength(3);
+    expect(fm.keyFacts).toHaveLength(2);
+  });
+  it("invalid enum or bad minutes are dropped, not thrown", () => {
+    const fm = parseFrontmatter(`---\ntitle: x\nutility: water\ndifficulty: hard\nminutes: چهار\n---\nb`, "t");
+    expect(fm.utility).toBeUndefined(); expect(fm.difficulty).toBeUndefined(); expect(fm.minutes).toBeUndefined();
+  });
+  it("legacy files (title/category/tags only) parse with empty lists and absent scalars", () => {
+    const fm = parseFrontmatter(`---\ntitle: x\ncategory: gas\ntags: ["الف"]\n---\nb`, "t");
+    expect(fm.sources).toEqual([]); expect(fm.objectives).toEqual([]); expect(fm.keyFacts).toEqual([]);
+    expect(fm.utility).toBeUndefined(); expect(fm.minutes).toBeUndefined();
+  });
+});
