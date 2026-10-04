@@ -3,7 +3,7 @@
 
 import { getDb, now, schema } from "@/lib/db";
 import { badCsrf, csrfGuard, currentAdmin, unauth } from "@/lib/auth/api";
-import { listArticles, saveArticle } from "@/lib/kb/repository";
+import { listArticles, normalizeArticleRow, saveArticle } from "@/lib/kb/repository";
 
 export const runtime = "nodejs";
 
@@ -13,15 +13,9 @@ export async function GET(): Promise<Response> {
   const rows = listArticles(getDb());
   return Response.json({
     articles: rows.map(({ article, chunkCount }) => ({
-      id: article.id,
-      slug: article.slug,
-      title: article.title,
-      category: article.category,
-      tags: JSON.parse(article.tags),
-      status: article.status,
-      source: article.source,
+      ...normalizeArticleRow(article),
+      tags: JSON.parse(article.tags), // array — not the raw JSON text from the row
       chunkCount,
-      updatedAt: article.updatedAt,
     })),
   });
 }

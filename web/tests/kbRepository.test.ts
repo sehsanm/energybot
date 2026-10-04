@@ -1,9 +1,21 @@
 import path from "node:path";
+import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import { makeTestDb, schema } from "@/lib/db";
-import { ensureSeeded, getArticle, listArticles, saveArticle, searchKb } from "@/lib/kb/repository";
+import { makeTestDb, now, schema } from "@/lib/db";
+import {
+  ensureSeeded,
+  getArticle,
+  listArticles,
+  normalizeArticleRow,
+  saveArticle,
+  searchKb,
+} from "@/lib/kb/repository";
 
 const SEED_DIR = [path.resolve(__dirname, "fixtures", "kb")];
+
+function getArticleBySlug(db: ReturnType<typeof makeTestDb>, slug: string) {
+  return db.select().from(schema.kbArticles).where(eq(schema.kbArticles.slug, slug)).get();
+}
 
 describe("KB repository", () => {
   it("seeds from files once; re-running is a no-op", () => {
@@ -93,5 +105,33 @@ describe("KB repository", () => {
     // old terms are gone from the index
     expect(searchKb(db, "ماشین لباسشویی")).toEqual([]);
     expect(searchKb(db, "متن کوتاه")).toHaveLength(1);
+  });
+});
+
+describe("saveArticle metadata + source", () => {
+  it("stores new fields on insert and preserves them on metadata-less update", () => {
+    const db = makeTestDb();
+    saveArticle(db, { slug: "01-x", title: "x", bodyMd: "body", category: "bills",
+      utility: "gas", difficulty: "deep", minutes: 7, sources: ["س"], objectives: ["ا"], keyFacts: ["ف"] });
+    saveArticle(db, { slug: "01-x", title: "x2", bodyMd: "body2", category: "bills" }); // no metadata passed
+    const v = normalizeArticleRow(getArticleBySlug(db, "01-x")!);
+    expect(v.title).toBe("x2"); expect(v.utility).toBe("gas"); expect(v.difficulty).toBe("deep");
+    expect(v.minutes).toBe(7); expect(v.keyFacts).toEqual(["ف"]);
+  });
+  it("update persists source=admin (admin edits survive reconciliation)", () => {
+    const db = makeTestDb();
+    saveArticle(db, { slug: "02-y", title: "y", bodyMd: "b", category: "cooling", source: "seed" });
+    saveArticle(db, { slug: "02-y", title: "y", bodyMd: "b ویرایش ادمین", category: "cooling", source: "admin" });
+    expect(getArticleBySlug(db, "02-y")!.source).toBe("admin");
+  });
+  it("normalizeArticleRow applies defaults for legacy null rows", () => {
+    const db = makeTestDb();
+    const t = now();
+    db.insert(schema.kbArticles).values({ id: "z", slug: "03-z", title: "z", bodyMd: "b",
+      category: "bills", tags: "[]", status: "published", source: "seed", createdAt: t, updatedAt: t }).run();
+    const row = db.select().from(schema.kbArticles).where(eq(schema.kbArticles.slug, "03-z")).get()!;
+    const v = normalizeArticleRow(row);
+    expect(v.utility).toBe("both"); expect(v.difficulty).toBe("starter"); expect(v.minutes).toBe(4);
+    expect(v.sources).toEqual([]); expect(v.objectives).toEqual([]); expect(v.keyFacts).toEqual([]);
   });
 });

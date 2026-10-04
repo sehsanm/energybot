@@ -2,7 +2,7 @@
 
 import { getDb } from "@/lib/db";
 import { currentAdmin, unauth } from "@/lib/auth/api";
-import { getArticle } from "@/lib/kb/repository";
+import { getArticle, normalizeArticleRow } from "@/lib/kb/repository";
 
 export const runtime = "nodejs";
 
@@ -14,13 +14,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   if (!article) return Response.json({ error: "not found" }, { status: 404 });
   return Response.json({
     article: {
-      id: article.id,
-      slug: article.slug,
-      title: article.title,
-      bodyMd: article.bodyMd,
-      category: article.category,
-      tags: JSON.parse(article.tags),
-      status: article.status,
+      ...normalizeArticleRow(article),
+      tags: JSON.parse(article.tags), // array — not the raw JSON text from the row
     },
   });
 }

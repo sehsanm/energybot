@@ -54,10 +54,52 @@ export interface SaveArticleInput {
   tags?: string[];
   status?: "draft" | "published";
   source?: "seed" | "admin";
+  utility?: "electricity" | "gas" | "both";
+  difficulty?: "starter" | "medium" | "deep";
+  minutes?: number;
+  sources?: string[];
+  objectives?: string[];
+  keyFacts?: string[];
+}
+
+/** A stored row with course metadata made non-null: legacy nulls get defaults, JSON arrays parsed. */
+export type KbArticleView = Omit<
+  typeof schema.kbArticles.$inferSelect,
+  "utility" | "difficulty" | "minutes" | "sources" | "objectives" | "keyFacts"
+> & {
+  utility: "electricity" | "gas" | "both";
+  difficulty: "starter" | "medium" | "deep";
+  minutes: number;
+  sources: string[];
+  objectives: string[];
+  keyFacts: string[];
+};
+
+function parseJsonArray(column: string | null): string[] {
+  try {
+    const parsed = JSON.parse(column ?? "[]");
+    return Array.isArray(parsed) ? (parsed as string[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Read defaults: legacy rows (pre-metadata columns are null) read as usable course articles. */
+export function normalizeArticleRow(row: typeof schema.kbArticles.$inferSelect): KbArticleView {
+  return {
+    ...row,
+    utility: (row.utility as KbArticleView["utility"]) ?? "both",
+    difficulty: (row.difficulty as KbArticleView["difficulty"]) ?? "starter",
+    minutes: row.minutes ?? 4,
+    sources: parseJsonArray(row.sources),
+    objectives: parseJsonArray(row.objectives),
+    keyFacts: parseJsonArray(row.keyFacts),
+  };
 }
 
 /** Upsert by slug; re-chunks and re-indexes. Drafts are indexed with no rows. */
 export function saveArticle(db: DB, input: SaveArticleInput): typeof schema.kbArticles.$inferSelect {
+  ensureFts(db); // saveArticle writes to kb_fts — must exist even on a fresh database
   const t = now();
   const existing = db.select().from(schema.kbArticles).where(eq(schema.kbArticles.slug, input.slug)).get();
   let id: string;
@@ -72,6 +114,13 @@ export function saveArticle(db: DB, input: SaveArticleInput): typeof schema.kbAr
         category: input.category,
         tags: JSON.stringify(input.tags ?? []),
         status: input.status ?? existing.status,
+        source: input.source ?? existing.source,
+        utility: input.utility ?? existing.utility,
+        difficulty: input.difficulty ?? existing.difficulty,
+        minutes: input.minutes ?? existing.minutes,
+        sources: input.sources !== undefined ? JSON.stringify(input.sources) : existing.sources,
+        objectives: input.objectives !== undefined ? JSON.stringify(input.objectives) : existing.objectives,
+        keyFacts: input.keyFacts !== undefined ? JSON.stringify(input.keyFacts) : existing.keyFacts,
         updatedAt: t,
       })
       .where(eq(schema.kbArticles.id, id))
@@ -88,6 +137,12 @@ export function saveArticle(db: DB, input: SaveArticleInput): typeof schema.kbAr
         tags: JSON.stringify(input.tags ?? []),
         status: input.status ?? "published",
         source: input.source ?? "admin",
+        utility: input.utility ?? null,
+        difficulty: input.difficulty ?? null,
+        minutes: input.minutes ?? null,
+        sources: input.sources !== undefined ? JSON.stringify(input.sources) : null,
+        objectives: input.objectives !== undefined ? JSON.stringify(input.objectives) : null,
+        keyFacts: input.keyFacts !== undefined ? JSON.stringify(input.keyFacts) : null,
         createdAt: t,
         updatedAt: t,
       })
