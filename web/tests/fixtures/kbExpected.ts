@@ -1,0 +1,15 @@
+// web/tests/fixtures/kbExpected.ts
+// Cluster slug → article slugs. Extended by every cluster task; kbContent.test.ts enforces exact match.
+export const EXPECTED_KB: Record<string, string[]> = {
+  bills: ["01-tariff-tiers", "02-peak-hours", "03-reading-your-bill", "04-gas-tariff"],
+  cooling: ["01-ac-savings"],
+  heating: ["01-boiler-thermostat"],
+  "hot-water": ["01-water-heater"],
+  kitchen: ["01-cooking-safety"],
+  appliances: ["01-refrigerator-appliances", "02-standby-power"],
+  lighting: ["01-lighting"],
+  envelope: ["01-insulation"],
+  solar: [],
+  safety: [],
+  behavior: ["01-seasonal-priorities", "02-priority-actions"],
+};
