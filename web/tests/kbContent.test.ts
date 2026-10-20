@@ -54,7 +54,7 @@ describe("KB article schema and style (every file)", () => {
     const words = fm.body.split(/\s+/).filter(Boolean).length;
     expect(words).toBeGreaterThanOrEqual(300);
     expect(words).toBeLessThanOrEqual(1150);
-    expect(fm.body.replace(/[A-Za-z0-9+.\-/%°]+/g, "")).not.toMatch(/\d/); // Persian digits only, latin runs exempt
+    expect(fm.body.replace(/[A-Za-z0-9+.\-/%°]*[A-Za-z][A-Za-z0-9+.\-/%°]*/g, "")).not.toMatch(/\d/); // Persian digits only, latin runs exempt
   });
 });
 
