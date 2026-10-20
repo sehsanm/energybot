@@ -9,7 +9,7 @@ export const EXPECTED_KB: Record<string, string[]> = {
   appliances: ["01-refrigerator-appliances", "02-standby-power", "03-energy-label-guide", "04-hidden-drains", "05-high-wattage-brief", "06-appliance-care"],
   lighting: ["01-lighting", "02-led-choosing", "03-timers-sensors"],
   envelope: ["01-insulation", "02-draught-sealing", "03-windows", "04-wall-roof-insulation", "05-curtains-coverings", "06-fresh-air"],
-  solar: [],
+  solar: ["01-rooftop-pv", "02-solar-economics", "03-grid-vs-offgrid"],
   safety: [],
   behavior: ["01-seasonal-priorities", "02-priority-actions"],
 };
