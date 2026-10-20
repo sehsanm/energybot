@@ -11,5 +11,5 @@ export const EXPECTED_KB: Record<string, string[]> = {
   envelope: ["01-insulation", "02-draught-sealing", "03-windows", "04-wall-roof-insulation", "05-curtains-coverings", "06-fresh-air"],
   solar: ["01-rooftop-pv", "02-solar-economics", "03-grid-vs-offgrid"],
   safety: ["01-carbon-monoxide", "02-gas-leak", "03-outage-preparedness", "04-home-electrical-safety"],
-  behavior: ["01-seasonal-priorities", "02-priority-actions"],
+  behavior: ["01-seasonal-priorities", "02-priority-actions", "03-weekly-meter-reading", "04-family-habits"],
 };
