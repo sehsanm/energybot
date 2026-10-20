@@ -6,7 +6,7 @@ export const EXPECTED_KB: Record<string, string[]> = {
   heating: ["01-boiler-thermostat", "02-boiler-service", "03-radiator-balancing", "04-room-heaters", "05-floor-heating", "06-smart-thermostats"],
   "hot-water": ["01-water-heater", "02-solar-water-heater", "03-shower-habits", "04-showerhead-aerator"],
   kitchen: ["01-cooking-safety", "02-stove-efficiency", "03-kettle-tea", "04-washing-machines", "05-oven-use"],
-  appliances: ["01-refrigerator-appliances", "02-standby-power"],
+  appliances: ["01-refrigerator-appliances", "02-standby-power", "03-energy-label-guide", "04-hidden-drains", "05-high-wattage-brief", "06-appliance-care"],
   lighting: ["01-lighting"],
   envelope: ["01-insulation"],
   solar: [],
