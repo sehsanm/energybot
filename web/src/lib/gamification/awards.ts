@@ -1,21 +1,33 @@
 // Transactional gamification writes — the award path. Every state change for
 // one lesson completion (completion row, xp/coin ledgers, streak, course
 // bonus, badges) happens inside a single better-sqlite3 transaction; the pure
-// math lives in ./engine and the Tehran-day logic in ./tehran. Outbox/event
-// emission (lesson_completed, badge_earned, …) is Task 6 — the emit points are
-// marked at the end of each transaction.
+// math lives in ./engine and the Tehran-day logic in ./tehran. App events
+// (lesson_completed, badge_earned, …) are queued inside the transaction and
+// emitted only AFTER it commits, so subscribers always observe durable state
+// and a failed emit can never roll an award back.
 
 import { randomUUID } from "node:crypto";
 import { and, eq, gte, lt, sum } from "drizzle-orm";
 import type { DB } from "@/lib/db";
 import { schema } from "@/lib/db";
 import { getCourse, getLesson } from "@/lib/courses/catalog";
+import { emitAppEvent } from "@/lib/events";
 import { BADGES, advanceStreak, computeLessonXp, evaluateBadges, scoreLesson, type StreakState } from "./engine";
 import { tehranDate } from "./tehran";
 
 /** The transaction handle `db.transaction` hands its callback. */
 type TxCallback = Parameters<DB["transaction"]>[0];
 type Tx = Parameters<TxCallback>[0];
+
+/** An app event queued during a transaction, emitted once it has committed. */
+interface PendingEvent {
+  name: string;
+  payload: Record<string, unknown>;
+}
+
+function emitQueued(events: PendingEvent[]): void {
+  for (const e of events) emitAppEvent(e.name, e.payload);
+}
 
 export interface StreakSnapshot {
   current: number;
@@ -159,7 +171,7 @@ export function awardLessonCompletion(
   const lesson = course ? getLesson(course, lessonSlug) : undefined;
   if (!course || !lesson) return { ok: false, error: "not_found" };
 
-  return db.transaction((tx) => {
+  const { outcome, events } = db.transaction((tx): { outcome: AwardOutcome; events: PendingEvent[] } => {
     const score = scoreLesson(lesson, answers);
     const today = tehranDate(now);
 
@@ -192,15 +204,33 @@ export function awardLessonCompletion(
         .run();
       const s = loadStreak(tx, userId);
       return {
-        ok: true,
-        result: {
-          accuracy: score.accuracy,
-          firstTryAccuracy: score.firstTryAccuracy,
-          xpAwarded: 0,
-          coinsAwarded: 0,
-          newBadges: [],
-          streak: { current: s.current, best: s.best, freezes: s.freezes },
+        outcome: {
+          ok: true,
+          result: {
+            accuracy: score.accuracy,
+            firstTryAccuracy: score.firstTryAccuracy,
+            xpAwarded: 0,
+            coinsAwarded: 0,
+            newBadges: [],
+            streak: { current: s.current, best: s.best, freezes: s.freezes },
+          },
         },
+        // Replays record the attempt but award nothing — lesson_completed is
+        // the only event; no award-like event without an award.
+        events: [
+          {
+            name: "lesson_completed",
+            payload: {
+              userId,
+              courseSlug,
+              lessonSlug,
+              accuracy: score.accuracy,
+              firstTryAccuracy: score.firstTryAccuracy,
+              xpAwarded: 0,
+              coinsAwarded: 0,
+            },
+          },
+        ],
       };
     }
 
@@ -311,25 +341,63 @@ export function awardLessonCompletion(
       tx.insert(schema.badgesEarned).values({ id: randomUUID(), userId, badgeKey, createdAt: now }).run();
     }
 
-    // Task 6 emit points (no events yet): lesson_completed, badge_earned,
-    // course_completed — everything above commits atomically with these results.
-
-    return {
-      ok: true,
-      result: {
-        accuracy: score.accuracy,
-        firstTryAccuracy: score.firstTryAccuracy,
-        xpAwarded: xp + perfectBonus + courseXp,
-        coinsAwarded,
-        newBadges,
-        streak: {
-          current: advanced.state.current,
-          best: advanced.state.best,
-          freezes: advanced.state.freezes,
+    // Queue the events for after commit: the award result, then the extras the
+    // call earned (course bonus once per course, each new badge, a streak that
+    // advanced — a comeback reset counts, a same-day repeat does not).
+    const events: PendingEvent[] = [
+      {
+        name: "lesson_completed",
+        payload: {
+          userId,
+          courseSlug,
+          lessonSlug,
+          accuracy: score.accuracy,
+          firstTryAccuracy: score.firstTryAccuracy,
+          xpAwarded: xp + perfectBonus + courseXp,
+          coinsAwarded,
         },
       },
+    ];
+    if (courseXp > 0) {
+      events.push({ name: "course_completed", payload: { userId, courseSlug } });
+    }
+    for (const badgeKey of newBadges) {
+      events.push({ name: "badge_earned", payload: { userId, badgeKey } });
+    }
+    if (advanced.changed) {
+      events.push({
+        name: "streak_updated",
+        payload: {
+          userId,
+          current: advanced.state.current,
+          best: advanced.state.best,
+          freezeConsumed: advanced.freezeConsumed,
+        },
+      });
+    }
+
+    return {
+      outcome: {
+        ok: true,
+        result: {
+          accuracy: score.accuracy,
+          firstTryAccuracy: score.firstTryAccuracy,
+          xpAwarded: xp + perfectBonus + courseXp,
+          coinsAwarded,
+          newBadges,
+          streak: {
+            current: advanced.state.current,
+            best: advanced.state.best,
+            freezes: advanced.state.freezes,
+          },
+        },
+      },
+      events,
     };
   });
+
+  emitQueued(events); // after commit — subscribers observe durable state
+  return outcome;
 }
 
 // --- freeze purchase ---------------------------------------------------------
@@ -340,11 +408,11 @@ export function awardLessonCompletion(
  * event is appended and streak_state.freezes is incremented.
  */
 export function purchaseFreeze(db: DB, userId: string, now: number): FreezeOutcome {
-  return db.transaction((tx) => {
+  const { outcome, events } = db.transaction((tx): { outcome: FreezeOutcome; events: PendingEvent[] } => {
     const state = loadStreak(tx, userId);
-    if (state.freezes >= 1) return { ok: false, error: "max_freezes" };
+    if (state.freezes >= 1) return { outcome: { ok: false, error: "max_freezes" }, events: [] };
     const coins = sumCoins(tx, userId);
-    if (coins < FREEZE_COST) return { ok: false, error: "insufficient_coins" };
+    if (coins < FREEZE_COST) return { outcome: { ok: false, error: "insufficient_coins" }, events: [] };
 
     tx.insert(schema.coinEvents)
       .values({
@@ -358,10 +426,19 @@ export function purchaseFreeze(db: DB, userId: string, now: number): FreezeOutco
       .run();
     saveStreak(tx, userId, { ...state, freezes: state.freezes + 1 }, now);
 
-    // Task 6 emit point (no events yet): freeze_purchased.
-
-    return { ok: true, freezes: state.freezes + 1, coins: coins - FREEZE_COST };
+    return {
+      outcome: { ok: true, freezes: state.freezes + 1, coins: coins - FREEZE_COST },
+      events: [
+        {
+          name: "freeze_purchased",
+          payload: { userId, freezes: state.freezes + 1, coins: coins - FREEZE_COST },
+        },
+      ],
+    };
   });
+
+  emitQueued(events); // after commit
+  return outcome;
 }
 
 // --- summary -----------------------------------------------------------------

@@ -3,9 +3,10 @@
 // every case seeds a users row). Uses the pilot course's real lessons for the
 // happy paths; `now` is always injected so Tehran-day boundaries are pinned.
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { makeTestDb, schema } from "@/lib/db";
 import { getCourses } from "@/lib/courses/catalog";
+import { emitAppEvent, subscribeAppEvent } from "@/lib/events";
 import {
   awardLessonCompletion,
   gamificationSummary,
@@ -340,5 +341,141 @@ describe("gamificationSummary", () => {
       badges: [],
       lessonsCompleted: 0,
     });
+  });
+});
+
+describe("events — awards emit after commit", () => {
+  const unsubs: Array<() => void> = [];
+  afterEach(() => {
+    for (const u of unsubs.splice(0)) u();
+  });
+
+  /** Subscribe one collector to each named event (auto-unsubscribed). */
+  function collect(...names: string[]) {
+    const got: Array<{ name: string; payload: Record<string, unknown> }> = [];
+    for (const name of names) {
+      unsubs.push(subscribeAppEvent(name, (payload) => got.push({ name, payload })));
+    }
+    return got;
+  }
+
+  it("a subscriber receives lesson_completed with the award payload on a first completion — after the row is committed", () => {
+    const db = makeTestDb();
+    seedUser(db);
+    const lesson = course.lessons[0];
+    const got = collect("lesson_completed");
+    let rowsAtEmit = -1;
+    unsubs.push(
+      subscribeAppEvent("lesson_completed", () => {
+        rowsAtEmit = db.select().from(schema.lessonCompletions).all().length;
+      }),
+    );
+
+    unwrap(awardLessonCompletion(db, "u1", course.slug, lesson.slug, answersMissing(0, "e6"), T0));
+
+    expect(got).toEqual([
+      {
+        name: "lesson_completed",
+        payload: {
+          userId: "u1",
+          courseSlug: course.slug,
+          lessonSlug: lesson.slug,
+          accuracy: 5 / 6,
+          firstTryAccuracy: 5 / 6,
+          xpAwarded: 8,
+          coinsAwarded: 1,
+        },
+      },
+    ]);
+    expect(rowsAtEmit).toBe(1); // emitted AFTER the transaction committed
+  });
+
+  it("a first completion also emits badge_earned + streak_updated; the course bonus adds course_completed", () => {
+    const db = makeTestDb();
+    seedUser(db);
+    const got = collect("lesson_completed", "badge_earned", "streak_updated", "course_completed");
+
+    unwrap(awardLessonCompletion(db, "u1", course.slug, course.lessons[0].slug, correctAnswers(0), T0));
+    // A perfect lesson earns first_lesson AND first_perfect.
+    expect(got.map((e) => e.name)).toEqual(["lesson_completed", "badge_earned", "badge_earned", "streak_updated"]);
+    expect(got[1].payload).toEqual({ userId: "u1", badgeKey: "first_lesson" });
+    expect(got[2].payload).toEqual({ userId: "u1", badgeKey: "first_perfect" });
+    expect(got[3].payload).toEqual({ userId: "u1", current: 1, best: 1, freezeConsumed: false });
+
+    // 6th and last lesson, same Tehran day: bonus fires, streak does NOT advance (gap 0).
+    got.length = 0;
+    for (let i = 1; i < course.lessons.length; i++) {
+      unwrap(awardLessonCompletion(db, "u1", course.slug, course.lessons[i].slug, correctAnswers(i), T0));
+    }
+    const last = got.slice(-4);
+    expect(last.map((e) => e.name)).toEqual(["lesson_completed", "course_completed", "badge_earned", "badge_earned"]);
+    expect(last[1].payload).toEqual({ userId: "u1", courseSlug: course.slug });
+    expect(last[2].payload).toEqual({ userId: "u1", badgeKey: "course_complete_1" });
+    expect(last[3].payload).toEqual({ userId: "u1", badgeKey: "xp_100" });
+  });
+
+  it("a replay emits ONLY lesson_completed — no award-like events without awards", () => {
+    const db = makeTestDb();
+    seedUser(db);
+    const lesson = course.lessons[0];
+    const got = collect("lesson_completed", "badge_earned", "streak_updated", "course_completed");
+
+    unwrap(awardLessonCompletion(db, "u1", course.slug, lesson.slug, answersMissing(0, "e6"), T0));
+    expect(got.map((e) => e.name)).toEqual(["lesson_completed", "badge_earned", "streak_updated"]);
+
+    got.length = 0;
+    unwrap(awardLessonCompletion(db, "u1", course.slug, lesson.slug, correctAnswers(0), T0 + 60_000));
+    expect(got).toEqual([
+      {
+        name: "lesson_completed",
+        payload: {
+          userId: "u1",
+          courseSlug: course.slug,
+          lessonSlug: lesson.slug,
+          accuracy: 1,
+          firstTryAccuracy: 1,
+          xpAwarded: 0,
+          coinsAwarded: 0,
+        },
+      },
+    ]);
+  });
+
+  it("unsubscribe stops delivery", () => {
+    const got: unknown[] = [];
+    const unsub = subscribeAppEvent("lesson_completed", (p) => got.push(p));
+    unsub();
+    unsub(); // idempotent
+    emitAppEvent("lesson_completed", { userId: "u1" });
+    expect(got).toEqual([]);
+  });
+
+  it("the console log still fires alongside subscribers", () => {
+    const calls: unknown[][] = [];
+    const spy = vi.spyOn(console, "log").mockImplementation((...a) => calls.push(a));
+    unsubs.push(subscribeAppEvent("lesson_completed", () => {}));
+    try {
+      emitAppEvent("lesson_completed", { userId: "u1" });
+    } finally {
+      spy.mockRestore();
+    }
+    expect(calls.some((a) => String(a[0]).includes("lesson_completed"))).toBe(true);
+  });
+
+  it("a throwing subscriber does not break the emitter or later subscribers", () => {
+    const got: unknown[] = [];
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    unsubs.push(
+      subscribeAppEvent("lesson_completed", () => {
+        throw new Error("boom");
+      }),
+    );
+    unsubs.push(subscribeAppEvent("lesson_completed", (p) => got.push(p)));
+    try {
+      expect(() => emitAppEvent("lesson_completed", { userId: "u1" })).not.toThrow();
+    } finally {
+      err.mockRestore();
+    }
+    expect(got).toEqual([{ userId: "u1" }]);
   });
 });
