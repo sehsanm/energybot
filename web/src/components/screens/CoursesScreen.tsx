@@ -58,7 +58,13 @@ const c = copy.coursesScreen;
 
 /** XP/coins/streak strip; hidden entirely while every counter is zero. */
 function StatsStrip({ me }: { me?: MeJson }) {
-  if (!me || (me.xp <= 0 && me.coins <= 0 && me.streak.current <= 0)) return null;
+  // freezes counts as a counter too: buying the last freeze can empty the
+  // purse, but the held freeze must stay visible on the strip.
+  if (
+    !me ||
+    (me.xp <= 0 && me.coins <= 0 && me.streak.current <= 0 && me.streak.freezes <= 0)
+  )
+    return null;
   return (
     <div className="flex items-center gap-1.5">
       {/* StreakFlame renders null at days 0 — gate it on the streak itself so
@@ -80,7 +86,85 @@ function StatsStrip({ me }: { me?: MeJson }) {
           🪙 {toFaDigits(me.coins)}
         </span>
       )}
+      {/* A held freeze (max one stocked) shows next to the coins it cost. */}
+      {me.streak.freezes === 1 && (
+        <span
+          aria-label={c.freezeHeld(me.streak.freezes)}
+          className="flex items-center gap-1 rounded-full bg-[var(--secondary)] px-3 py-1 text-xs font-bold text-[var(--secondary-foreground)]"
+        >
+          ❄️ {toFaDigits(me.streak.freezes)}
+        </span>
+      )}
     </div>
+  );
+}
+
+/** Buy-a-streak-freeze chip — the coin sink (spec §2: ۵ coins, max one held).
+ *  Disabled exactly at one held freeze or below the price, with the why in
+ *  `title`; a successful buy patches the local `me` (no refetch). */
+function FreezeControl({
+  me,
+  onBought,
+}: {
+  me: MeJson;
+  onBought: (freezes: number, coins: number) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+  const [reason, setReason] = useState<string | null>(null);
+  const held = me.streak.freezes >= 1;
+  // Spec §5: the button is disabled at one held freeze or below ۵ coins.
+  const freezeDisabled = me.streak.freezes >= 1 || me.coins < 5;
+
+  useEffect(() => {
+    if (!done) return;
+    const t = setTimeout(() => setDone(false), 2500); // brief confirmation
+    return () => clearTimeout(t);
+  }, [done]);
+
+  const buy = () => {
+    if (freezeDisabled || busy) return;
+    setBusy(true);
+    setReason(null);
+    api<{ freezes: number; coins: number }>("/api/gamification/freeze", { method: "POST" })
+      .then((r) => {
+        onBought(r.freezes, r.coins);
+        setDone(true);
+      })
+      .catch((e: Error) => {
+        // Defensive only — the disabled state should have prevented these.
+        if (e.message === "max_freezes") setReason(c.freezeMaxReason);
+        else if (e.message === "insufficient_coins") setReason(c.freezePoorReason);
+      })
+      .finally(() => setBusy(false));
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={buy}
+        disabled={freezeDisabled}
+        aria-disabled={freezeDisabled}
+        title={held ? c.freezeMaxReason : freezeDisabled ? c.freezePoorReason : c.freezeBuy}
+        className={cn(
+          "flex shrink-0 items-center gap-1 rounded-full px-3 py-1 text-xs font-bold",
+          freezeDisabled
+            ? "cursor-default opacity-60"
+            : "bg-[var(--primary)] text-[var(--primary-foreground)] transition-transform active:scale-[0.97]",
+        )}
+      >
+        ❄️ {held ? c.freezeHeld(me.streak.freezes) : `${c.freezeLabel} · ${c.freezeCost}`}
+      </button>
+      {done && (
+        <Badge className="rounded-full bg-[var(--streak)]/15 px-2 text-[9px] text-[var(--streak)]">
+          {c.freezeDone}
+        </Badge>
+      )}
+      {reason && (
+        <span className="text-[10px] font-bold text-[var(--muted-foreground)]">{reason}</span>
+      )}
+    </>
   );
 }
 
@@ -201,6 +285,13 @@ export default function CoursesScreen({
   const done = course?.lessons.filter((l) => l.state === "completed").length ?? 0;
   const total = course?.lessons.length ?? 0;
 
+  /** Freeze bought — patch the local me (freezes/coins) from the response. */
+  const freezeBought = (freezes: number, coins: number) => {
+    setData((d) =>
+      d?.me ? { ...d, me: { ...d.me, coins, streak: { ...d.me.streak, freezes } } } : d,
+    );
+  };
+
   return (
     <AppShell>
       {course ? (
@@ -233,7 +324,11 @@ export default function CoursesScreen({
           <EmptyState icon="🎓" title={c.emptyTitle} desc={c.emptyDesc} />
         ) : course ? (
           <>
-            <StatsStrip me={me} />
+            {/* StatsStrip + the freeze-purchase chip share a row (authed only). */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <StatsStrip me={me} />
+              {me && <FreezeControl me={me} onBought={freezeBought} />}
+            </div>
             <ProgressTrack done={done} total={total} />
             <Card>
               <CardContent className="px-4">

@@ -67,6 +67,36 @@ describe("courses screen wiring", () => {
   });
 });
 
+describe("courses screen freeze purchase (spec §2/§5 — the coin sink)", () => {
+  test("buys through POST /api/gamification/freeze via the shared CSRF-aware api helper", () => {
+    expect(screen).toContain("/api/gamification/freeze");
+    expect(screen).toContain('method: "POST"');
+    // the server's two 400 reasons are mapped to copy — defensive only, the
+    // disabled state should have prevented both
+    expect(screen).toContain("max_freezes");
+    expect(screen).toContain("insufficient_coins");
+  });
+
+  test("the chip is disabled exactly at one held freeze or below five coins", () => {
+    expect(screen).toContain("me.streak.freezes >= 1 || me.coins < 5");
+  });
+
+  test("carries the freeze copy under coursesScreen", () => {
+    const c = copy.coursesScreen;
+    expect(c.freezeBuy).toBe("خرید یخ‌بند");
+    expect(c.freezeCost).toBe("۵ سکه");
+    expect(c.freezeHeld(1)).toBe("یخ‌بند (۱)");
+    expect(c.freezeMaxReason).toBeTruthy();
+    expect(c.freezePoorReason).toBeTruthy();
+    expect(c.freezeDone).toBe("یخ‌بند فعال شد");
+  });
+
+  test("a held freeze is visible on the strip — ❄️ chip when freezes === 1", () => {
+    expect(screen).toContain("me.streak.freezes === 1");
+    expect(screen).toMatch(/❄️\s*\{toFaDigits\(me\.streak\.freezes\)\}/);
+  });
+});
+
 describe("coursesScreen copy", () => {
   test("carries the header, progress and accuracy strings in Persian digits", () => {
     const c = copy.coursesScreen;

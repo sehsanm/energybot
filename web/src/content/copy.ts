@@ -184,6 +184,14 @@ export const copy = {
     lockedBadge: "قفل",
     lockedAria: "این درس هنوز قفل است",
     openAria: "شروع درس",
+    // Streak-freeze purchase — the coin sink (spec §2: ۵ coins, max one held).
+    freezeBuy: "خرید یخ‌بند",
+    freezeLabel: "یخ‌بند",
+    freezeCost: "۵ سکه",
+    freezeHeld: (n: number) => `یخ‌بند (${n.toLocaleString("fa-IR")})`,
+    freezeMaxReason: "حداکثر یک یخ‌بند می‌تونی داشته باشی",
+    freezePoorReason: "برای خرید یخ‌بند ۵ سکه لازم داری",
+    freezeDone: "یخ‌بند فعال شد",
     // The 10 clusters that get their own course after the pilot (درس‌ها ghosts).
     ghosts: [
       { emoji: "❄️", label: "سرمایش" },
