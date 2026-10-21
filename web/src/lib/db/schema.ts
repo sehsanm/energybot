@@ -194,7 +194,9 @@ export const lessonCompletions = sqliteTable(
   "lesson_completions",
   {
     id: text("id").primaryKey(), // uuid
-    userId: text("user_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
     courseSlug: text("course_slug").notNull(),
     lessonSlug: text("lesson_slug").notNull(),
     accuracy: real("accuracy").notNull(),
@@ -210,7 +212,9 @@ export const xpEvents = sqliteTable(
   "xp_events",
   {
     id: text("id").primaryKey(), // uuid
-    userId: text("user_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
     kind: text("kind").notNull(),
     amount: integer("amount").notNull(),
     ref: text("ref").notNull(),
@@ -224,7 +228,9 @@ export const coinEvents = sqliteTable(
   "coin_events",
   {
     id: text("id").primaryKey(), // uuid
-    userId: text("user_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
     kind: text("kind").notNull(),
     amount: integer("amount").notNull(),
     ref: text("ref").notNull(),
@@ -233,12 +239,14 @@ export const coinEvents = sqliteTable(
   (t) => [index("ix_coin_events_user").on(t.userId)],
 );
 
-// One row per user (upserted by the engine). Dates are YYYY-MM-DD in Tehran time.
+// One row per user (upserted by the engine).
 export const streakState = sqliteTable("streak_state", {
-  userId: text("user_id").primaryKey(),
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
   current: integer("current").notNull(),
   best: integer("best").notNull(),
-  lastActiveDate: text("last_active_date").notNull(),
+  lastActiveDate: text("last_active_date").notNull(), // Gregorian YYYY-MM-DD, Asia/Tehran day
   freezes: integer("freezes").notNull(), // 0 | 1
   updatedAt: integer("updated_at").notNull(),
 });
@@ -247,7 +255,9 @@ export const badgesEarned = sqliteTable(
   "badges_earned",
   {
     id: text("id").primaryKey(), // uuid
-    userId: text("user_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
     badgeKey: text("badge_key").notNull(),
     createdAt: integer("created_at").notNull(),
   },

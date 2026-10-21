@@ -1,5 +1,6 @@
 // Gamification user-state tables (migration 0004): insert/select roundtrips
 // for the five tables plus the UNIQUE(user_id, badge_key) badge guard.
+// user_id references users(id) ON DELETE cascade, so every case seeds a user.
 
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
@@ -7,9 +8,14 @@ import { makeTestDb, now, schema } from "@/lib/db";
 
 const T = now();
 
+function seedUser(db: ReturnType<typeof makeTestDb>, id: string) {
+  db.insert(schema.users).values({ id, createdAt: T }).run();
+}
+
 describe("gamification user-state tables", () => {
   it("stores and returns a lesson completion", () => {
     const db = makeTestDb();
+    seedUser(db, "u1");
     db.insert(schema.lessonCompletions)
       .values({
         id: "lc1",
@@ -36,6 +42,7 @@ describe("gamification user-state tables", () => {
 
   it("stores and returns xp and coin ledger events", () => {
     const db = makeTestDb();
+    seedUser(db, "u1");
     db.insert(schema.xpEvents)
       .values({ id: "x1", userId: "u1", kind: "lesson", amount: 40, ref: "bills-101/01-bill-anatomy", createdAt: T })
       .run();
@@ -50,17 +57,35 @@ describe("gamification user-state tables", () => {
 
   it("stores and returns streak state keyed by user", () => {
     const db = makeTestDb();
+    seedUser(db, "u1");
     db.insert(schema.streakState)
-      .values({ userId: "u1", current: 3, best: 7, lastActiveDate: "1404-07-29", freezes: 0, updatedAt: T })
+      .values({ userId: "u1", current: 3, best: 7, lastActiveDate: "2026-10-21", freezes: 0, updatedAt: T })
       .run();
     const row = db.select().from(schema.streakState).where(eq(schema.streakState.userId, "u1")).get()!;
-    expect(row).toMatchObject({ current: 3, best: 7, lastActiveDate: "1404-07-29", freezes: 0, updatedAt: T });
+    expect(row).toMatchObject({ current: 3, best: 7, lastActiveDate: "2026-10-21", freezes: 0, updatedAt: T });
+  });
+
+  it("stores and returns earned badges", () => {
+    const db = makeTestDb();
+    seedUser(db, "u1");
+    db.insert(schema.badgesEarned).values({ id: "b1", userId: "u1", badgeKey: "first_lesson", createdAt: T }).run();
+    const row = db.select().from(schema.badgesEarned).where(eq(schema.badgesEarned.id, "b1")).get()!;
+    expect(row).toMatchObject({ userId: "u1", badgeKey: "first_lesson", createdAt: T });
   });
 
   it("rejects a duplicate (user_id, badge_key) badge", () => {
     const db = makeTestDb();
+    seedUser(db, "u1");
     const badge = { userId: "u1", badgeKey: "first_lesson", createdAt: T };
     db.insert(schema.badgesEarned).values({ id: "b1", ...badge }).run();
     expect(() => db.insert(schema.badgesEarned).values({ id: "b2", ...badge }).run()).toThrow();
+  });
+
+  it("cascades gamification rows away when the user is deleted", () => {
+    const db = makeTestDb();
+    seedUser(db, "u1");
+    db.insert(schema.xpEvents).values({ id: "x1", userId: "u1", kind: "lesson", amount: 40, ref: "r", createdAt: T }).run();
+    db.delete(schema.users).where(eq(schema.users.id, "u1")).run();
+    expect(db.select().from(schema.xpEvents).where(eq(schema.xpEvents.id, "x1")).get()).toBeUndefined();
   });
 });
