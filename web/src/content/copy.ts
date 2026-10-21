@@ -162,6 +162,8 @@ export const copy = {
     errorTitle: "درس‌ها الان باز نشد",
     errorDesc: "یه اشکالی پیش اومد؛ یک لحظه بعد دوباره امتحان کن. 🙏",
     retryBtn: "تلاش دوباره",
+    emptyTitle: "هنوز درسی منتشر نشده",
+    emptyDesc: "به‌زودی اولین دورهٔ آموزشی می‌رسد! 🎓",
     startBtn: "شروع",
     continueBtn: "ادامه",
     soonTitle: "دوره‌های بعدی",

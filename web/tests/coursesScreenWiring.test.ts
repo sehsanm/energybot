@@ -42,6 +42,17 @@ describe("courses screen wiring", () => {
   test("renders the «به‌زودی» ghosts from copy, not a hardcoded list", () => {
     expect(screen).toMatch(/\.ghosts/);
   });
+
+  test("fetch failure and empty catalog render different states (no conflation)", () => {
+    // `failed` must be checked before the empty branch: a successful fetch
+    // with zero courses must never show the error+retry card.
+    const errAt = screen.indexOf(") : failed ? (");
+    const emptyAt = screen.indexOf(") : courses.length === 0 ? (");
+    expect(errAt).toBeGreaterThan(-1);
+    expect(emptyAt).toBeGreaterThan(errAt);
+    // the empty branch renders its own copy, not the error strings
+    expect(screen).toContain("emptyTitle");
+  });
 });
 
 describe("coursesScreen copy", () => {
@@ -60,6 +71,14 @@ describe("coursesScreen copy", () => {
     expect(c.errorTitle).toBeTruthy();
     expect(c.errorDesc).toBeTruthy();
     expect(c.retryBtn).toBeTruthy();
+  });
+
+  test("empty catalog has its own copy — distinct from the error strings", () => {
+    const c = copy.coursesScreen;
+    expect(c.emptyTitle).toBeTruthy();
+    expect(c.emptyDesc).toBeTruthy();
+    expect(c.emptyTitle).not.toBe(c.errorTitle);
+    expect(c.emptyDesc).not.toBe(c.errorDesc);
   });
 
   test("ghost cards cover all 10 upcoming clusters in the spec order", () => {

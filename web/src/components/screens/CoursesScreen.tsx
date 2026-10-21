@@ -198,12 +198,15 @@ export default function CoursesScreen({
               {c.loading}
             </CardContent>
           </Card>
-        ) : courses.length === 0 ? (
+        ) : failed ? (
           <EmptyState icon="🎓" title={c.errorTitle} desc={c.errorDesc}>
             <Button className="h-12 w-full rounded-full text-base font-black" onClick={load}>
               {c.retryBtn}
             </Button>
           </EmptyState>
+        ) : courses.length === 0 ? (
+          // successful fetch, empty catalog — not an error, so no retry card
+          <EmptyState icon="🎓" title={c.emptyTitle} desc={c.emptyDesc} />
         ) : course ? (
           <>
             <StatsStrip me={me} />
