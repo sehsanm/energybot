@@ -138,6 +138,46 @@ describe("awardLessonCompletion — happy path", () => {
   });
 });
 
+describe("firstTry map (task 11 fix — re-queued misses are not first-try)", () => {
+  it("player payload shape: all answers correct but e1 corrected on retry → accuracy 1, firstTryAccuracy 5/6, xp 8, no first_perfect", () => {
+    const db = makeTestDb();
+    seedUser(db);
+    const answers = correctAnswers(0); // all six correct — e1's entry IS the corrected retry
+    const firstTry: Record<string, true> = { e2: true, e3: true, e4: true, e5: true, e6: true };
+    const r = unwrap(awardLessonCompletion(db, "u1", course.slug, course.lessons[0].slug, answers, T0, firstTry));
+    expect(r).toEqual({
+      accuracy: 1,
+      firstTryAccuracy: 5 / 6,
+      xpAwarded: 8, // round(10 × 5/6) — no perfect bonus, no first_perfect
+      coinsAwarded: 1,
+      newBadges: ["first_lesson"],
+      streak: { current: 1, best: 1, freezes: 0 },
+    });
+  });
+
+  it("direct API payload without the map: legacy semantics unchanged (perfect 15 + first_perfect)", () => {
+    const db = makeTestDb();
+    seedUser(db);
+    const r = unwrap(awardLessonCompletion(db, "u1", course.slug, course.lessons[0].slug, correctAnswers(0), T0));
+    expect(r).toMatchObject({
+      accuracy: 1,
+      firstTryAccuracy: 1,
+      xpAwarded: 15,
+      newBadges: ["first_lesson", "first_perfect"],
+    });
+  });
+
+  it("the map can only REDUCE: an id the answer got wrong earns no first-try credit despite the claim", () => {
+    const db = makeTestDb();
+    seedUser(db);
+    const answers = { ...correctAnswers(0), e1: 1 }; // e1 actually wrong
+    const firstTry: Record<string, true> = { e1: true, e2: true, e3: true, e4: true, e5: true, e6: true };
+    const r = unwrap(awardLessonCompletion(db, "u1", course.slug, course.lessons[0].slug, answers, T0, firstTry));
+    expect(r.accuracy).toBe(5 / 6);
+    expect(r.firstTryAccuracy).toBe(5 / 6); // e1 not granted — firstTry needs correct too
+  });
+});
+
 describe("replay never re-awards", () => {
   it("second call on the same lesson: only a completion row (xp 0, better accuracy); ledgers/streak/badges untouched", () => {
     const db = makeTestDb();

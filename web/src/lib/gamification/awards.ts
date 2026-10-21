@@ -158,6 +158,8 @@ function completedCourses(tx: Tx, userId: string): string[] {
  * The completion row is ALWAYS written (replays may improve the recorded
  * accuracy); ledgers/streak/course/badges change only on the user's FIRST
  * completion of that lesson. `now` is epoch ms and decides the Tehran day.
+ * `firstTry` (task 11 fix, optional) is the player's validated report of ids
+ * correct on their first presentation — it can only reduce firstTryAccuracy.
  */
 export function awardLessonCompletion(
   db: DB,
@@ -166,13 +168,14 @@ export function awardLessonCompletion(
   lessonSlug: string,
   answers: Record<string, unknown>,
   now: number,
+  firstTry?: Record<string, true>,
 ): AwardOutcome {
   const course = getCourse(courseSlug);
   const lesson = course ? getLesson(course, lessonSlug) : undefined;
   if (!course || !lesson) return { ok: false, error: "not_found" };
 
   const { outcome, events } = db.transaction((tx): { outcome: AwardOutcome; events: PendingEvent[] } => {
-    const score = scoreLesson(lesson, answers);
+    const score = scoreLesson(lesson, answers, firstTry);
     const today = tehranDate(now);
 
     const prior = tx

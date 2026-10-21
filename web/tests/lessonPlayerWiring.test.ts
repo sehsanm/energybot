@@ -25,6 +25,11 @@ describe("lesson player wiring", () => {
     expect(player).toMatch(/body:\s*\{\s*answers\b/);
   });
 
+  test("submits the first-try map alongside answers (miss-then-corrected ids excluded)", () => {
+    expect(player).toMatch(/body:\s*\{\s*answers,\s*firstTry\b/);
+    expect(player).toContain("firstTryRef");
+  });
+
   test("renders all four exercise kinds", () => {
     for (const kind of ["mcq", "truefalse", "numeric", "scenario"]) {
       expect(player).toContain(`"${kind}"`);

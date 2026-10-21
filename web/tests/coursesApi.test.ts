@@ -175,6 +175,46 @@ describe("validateAnswers — the gate before the engine", () => {
   });
 });
 
+describe("validateAnswers — the optional firstTry map (task 11 fix)", () => {
+  it("absent map passes through: ok with NO firstTry key (direct API callers unaffected)", () => {
+    const body = perfectBody();
+    const v = validateAnswers(lesson1, body);
+    expect(v).toEqual({ ok: true, answers: body.answers });
+    if (v.ok) expect("firstTry" in v).toBe(false);
+  });
+
+  it("accepts the map for known exercise ids: returned verbatim", () => {
+    const body: Record<string, unknown> = { ...perfectBody(), firstTry: { e1: true, e3: true } };
+    expect(validateAnswers(lesson1, body)).toEqual({
+      ok: true,
+      answers: body.answers,
+      firstTry: { e1: true, e3: true },
+    });
+  });
+
+  it("empty map {} is a legal payload (every exercise was a miss first)", () => {
+    const body: Record<string, unknown> = { ...perfectBody(), firstTry: {} };
+    expect(validateAnswers(lesson1, body)).toEqual({ ok: true, answers: body.answers, firstTry: {} });
+  });
+
+  it("strips unknown keys instead of rejecting (client refs may drift)", () => {
+    const body: Record<string, unknown> = { ...perfectBody(), firstTry: { e1: true, nope: true } };
+    expect(validateAnswers(lesson1, body)).toEqual({ ok: true, answers: body.answers, firstTry: { e1: true } });
+  });
+
+  it.each([
+    ["firstTry is an array", { firstTry: ["e1"] }],
+    ["firstTry is a string", { firstTry: "e1" }],
+    ["firstTry is null", { firstTry: null }],
+    ["firstTry is a number", { firstTry: 1 }],
+    ["value false (boolean but not strictly true)", { firstTry: { e1: false } }],
+    ["value \"true\" (string)", { firstTry: { e1: "true" } }],
+    ["value 1", { firstTry: { e1: 1 } }],
+  ])("rejects: %s", (_label, extra) => {
+    expect(validateAnswers(lesson1, { ...perfectBody(), ...extra })).toEqual({ ok: false });
+  });
+});
+
 describe("complete — the award the route returns (server-computed)", () => {
   it("perfect answers → full XP: xp 10 + perfect 5, daily coin, streak 1, first_lesson + first_perfect", () => {
     const db = makeTestDb();
@@ -360,6 +400,9 @@ describe("complete + freeze route wiring (structural — no route-boundary harne
     // the gate runs BEFORE the engine, and only its sanitized answers are passed on
     expect(route.indexOf("validateAnswers")).toBeLessThan(route.indexOf("awardLessonCompletion"));
     expect(route).toMatch(/awardLessonCompletion\([\s\S]*?\bv\.answers\b/);
+    // the sanitized firstTry map rides along (task 11 fix) — never a raw field
+    expect(route).toMatch(/awardLessonCompletion\([\s\S]*?\bv\.firstTry\b/);
+    expect(route).not.toContain("body.firstTry");
     expect(route).toContain('"not_found"');
     expect(route).toMatch(/status:\s*404/);
     expect(route).toContain('"bad request"');

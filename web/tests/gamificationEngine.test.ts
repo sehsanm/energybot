@@ -94,6 +94,29 @@ describe("scoreLesson", () => {
     expect(withJunk.accuracy).toBe(clean.accuracy);
   });
 
+  it("firstTry map present: a corrected retry is correct but NOT first-try — firstTryAccuracy ≤ accuracy", () => {
+    const full = { e1: 2, e2: true, e3: 100, e4: 37.5, e5: 0 }; // all correct…
+    // …but the map says e1 was a MISS first (re-queued, corrected on retry)
+    const r = scoreLesson(lesson, full, { e2: true, e3: true, e4: true, e5: true });
+    expect(r.accuracy).toBe(1);
+    expect(r.firstTryAccuracy).toBe(4 / 5);
+    expect(r.perExercise.get("e1")).toEqual({ correct: true, firstTry: false });
+    expect(r.perExercise.get("e2")).toEqual({ correct: true, firstTry: true });
+  });
+
+  it("firstTry map cannot GRANT first-try credit to a wrong answer", () => {
+    const r = scoreLesson(lesson, { e1: 0 }, { e1: true }); // e1 actually wrong
+    expect(r.perExercise.get("e1")).toEqual({ correct: false, firstTry: false });
+    expect(r.firstTryAccuracy).toBe(0);
+  });
+
+  it("firstTry map absent: legacy semantics — firstTry coincides with correct (direct API callers unaffected)", () => {
+    const full = { e1: 2, e2: true, e3: 100, e4: 37.5, e5: 0 };
+    const r = scoreLesson(lesson, full);
+    expect(r.firstTryAccuracy).toBe(1);
+    for (const ex of lesson.exercises) expect(r.perExercise.get(ex.id)?.firstTry).toBe(true);
+  });
+
   it("all-wrong answers give accuracy 0; all-correct give 1", () => {
     expect(scoreLesson(lesson, {}).accuracy).toBe(0);
     const full = { e1: 2, e2: true, e3: 96, e4: 37.5, e5: 0 };

@@ -31,7 +31,7 @@ export async function POST(
   const v = validateAnswers(lesson, body);
   if (!v.ok) return Response.json({ error: "bad request" }, { status: 400 });
 
-  const outcome = awardLessonCompletion(getDb(), user.id, courseSlug, lessonSlug, v.answers, Date.now());
+  const outcome = awardLessonCompletion(getDb(), user.id, courseSlug, lessonSlug, v.answers, Date.now(), v.firstTry);
   if (!outcome.ok) return Response.json({ error: "not_found" }, { status: 404 });
   return Response.json(outcome.result);
 }

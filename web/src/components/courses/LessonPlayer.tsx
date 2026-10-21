@@ -4,8 +4,10 @@
 // CoursesScreen ON TOP of the catalog (in-component state, no routing): intro
 // card → one-at-a-time exercise stream with instant feedback and a single
 // re-queue per missed exercise → server-scored summary celebration. Scoring
-// stays server-authoritative: the player collects RAW answers only and renders
-// the AwardResult the complete endpoint computes.
+// stays server-authoritative: the player sends RAW answers plus a firstTry
+// map (ids correct on their FIRST presentation — a wrong-then-corrected
+// exercise is deliberately absent, so it can't score بی‌نقص) and renders the
+// AwardResult the complete endpoint computes.
 
 import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, Volume2, X, XCircle } from "lucide-react";
@@ -119,7 +121,9 @@ export default function LessonPlayer({
 
   // bookkeeping refs — nothing renders straight from these
   const repeatedRef = useRef<Set<string>>(new Set()); // re-queue guard (once)
-  const firstTryRef = useRef<Set<string>>(new Set()); // correct on FIRST presentation
+  // correct on FIRST presentation — sent as the validated firstTry map so a
+  // miss-then-corrected exercise can never score first-try (بی‌نقص) server-side
+  const firstTryRef = useRef<Set<string>>(new Set());
   const audioRef = useRef<HTMLAudioElement | null>(null);
   /** decided from the state fetched BEFORE playing — gates the confetti */
   const [firstCompletion, setFirstCompletion] = useState(true);
@@ -137,6 +141,9 @@ export default function LessonPlayer({
       .catch(() => setFailed(true));
   };
   useEffect(load, [courseSlug, lessonSlug]);
+
+  // intro audio must not keep playing after the player unmounts (× / done)
+  useEffect(() => () => audioRef.current?.pause(), []);
 
   const ex = queue[index];
 
@@ -195,9 +202,13 @@ export default function LessonPlayer({
     setSubmitting(true);
     setSubmitFailed(false);
     try {
+      // firstTry: ids correct on their FIRST presentation, snapshotted now —
+      // re-queue corrected ids are absent, so the server never awards بی‌نقص
+      // for a miss-then-corrected exercise (the map is validated + bounded).
+      const firstTry = Object.fromEntries([...firstTryRef.current].map((id) => [id, true as const]));
       const r = await api<AwardJson>(`/api/courses/${courseSlug}/lessons/${lessonSlug}/complete`, {
         method: "POST",
-        body: { answers },
+        body: { answers, firstTry },
       });
       setResult(r);
       setStep("summary");

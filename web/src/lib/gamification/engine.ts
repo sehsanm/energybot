@@ -16,7 +16,7 @@ export interface LessonScore {
   perExercise: Map<string, ScoredExercise>;
   /** fraction of ALL lesson exercises answered correctly (0–1) */
   accuracy: number;
-  /** fraction of ALL lesson exercises correct on this attempt (0–1) */
+  /** fraction of ALL lesson exercises correct on their FIRST presentation (0–1) */
   firstTryAccuracy: number;
 }
 
@@ -36,22 +36,35 @@ function isCorrect(ex: Exercise, v: unknown): boolean {
 /**
  * Score one submitted answer payload against a lesson. `answers` maps exercise
  * id → submitted value; ids not present in the lesson are ignored, exercises
- * without an entry in `answers` score as incorrect. The payload is a single
- * attempt, so `firstTry` coincides with `correct` here — the field exists so
- * retry-aware callers can distinguish a replay (first completion is what XP
- * and badges read).
+ * without an entry in `answers` score as incorrect.
+ *
+ * `firstTryMap` (task 11 fix, optional): the player's report of which ids were
+ * answered correctly on their FIRST presentation — a wrong-then-corrected
+ * (re-queued) exercise is correct but not first-try. Bounded stakes: the map
+ * can only ever REDUCE first-try credit (an id needs `correct` too), and an
+ * absent map keeps the legacy single-attempt semantics where `firstTry`
+ * coincides with `correct`, so direct API callers are unaffected. Either way
+ * `firstTryAccuracy ≤ accuracy` is enforced here, server-side.
  */
-export function scoreLesson(lesson: Lesson, answers: Record<string, unknown>): LessonScore {
+export function scoreLesson(
+  lesson: Lesson,
+  answers: Record<string, unknown>,
+  firstTryMap?: Record<string, true>,
+): LessonScore {
   const perExercise = new Map<string, ScoredExercise>();
   let correctCount = 0;
+  let firstTryCount = 0;
   for (const ex of lesson.exercises) {
     const correct = isCorrect(ex, answers[ex.id]);
     if (correct) correctCount += 1;
-    perExercise.set(ex.id, { correct, firstTry: correct });
+    const firstTry = correct && (firstTryMap ? firstTryMap[ex.id] === true : true);
+    if (firstTry) firstTryCount += 1;
+    perExercise.set(ex.id, { correct, firstTry });
   }
   const total = lesson.exercises.length;
   const accuracy = total === 0 ? 0 : correctCount / total;
-  return { perExercise, accuracy, firstTryAccuracy: accuracy };
+  const firstTryAccuracy = total === 0 ? 0 : firstTryCount / total;
+  return { perExercise, accuracy, firstTryAccuracy };
 }
 
 // --- streak ----------------------------------------------------------------
