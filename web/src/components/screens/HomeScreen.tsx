@@ -1,7 +1,7 @@
 "use client";
 
-// Home screen (Stitch 01-home): greeting + avatar, streak/XP slot (v3-ready,
-// hidden at zero), latest-bill card, insights preview, quick actions.
+// Home screen (Stitch 01-home): greeting + avatar, streak/XP/coins strip
+// (hidden at zero), latest-bill card, insights preview, quick actions.
 // Also the onboarding entry point (spec §6): un-onboarded sessions are taken
 // over by /welcome, and a skipped wizard leaves a «کامل کردن پروفایل» card
 // here instead of the first-bill empty state until the profile has data.
@@ -32,10 +32,22 @@ interface BillJson {
   createdAt: number;
 }
 
+/** The `gamification` block of GET /api/me (lib/courses/apiViews.ts). */
+interface GamificationJson {
+  xp: number;
+  coins: number;
+  streak: { current: number; best: number; freezes: number };
+  badges: string[];
+  lessonsCompleted: number;
+}
+
 interface MeJson {
   user: { displayName: string | null };
   onboarded: boolean;
   skipped: boolean;
+  // Optional: a payload without it (older server, edge case) must not crash
+  // the screen — the strip simply stays hidden.
+  gamification?: GamificationJson | null;
 }
 
 export default function HomeScreen() {
@@ -82,6 +94,14 @@ export default function HomeScreen() {
   const firstName = (me?.user.displayName ?? "دوست من").split(" ")[0];
   const loading = bills === null || (me === null && !meFailed);
   const welcomeCard = me?.onboarded === false && profileEmpty === true && !latest;
+  // The gamification strip only exists when there is something to show:
+  // /api/me answered with gamification AND at least one counter is nonzero.
+  // Fresh accounts keep the bare greeting — no empty chips.
+  const stats =
+    me?.gamification &&
+    (me.gamification.xp > 0 || me.gamification.coins > 0 || me.gamification.streak.current > 0)
+      ? me.gamification
+      : null;
 
   return (
     <AppShell>
@@ -95,8 +115,21 @@ export default function HomeScreen() {
             <p className="text-xs text-[var(--muted-foreground)]">سلام</p>
             <h1 className="text-xl font-black leading-tight">{firstName} 👋</h1>
           </div>
-          {/* v3 slot: hidden until the gamification core ships real numbers */}
-          <StreakFlame days={0} />
+          {/* v3 gamification strip: streak + ⚡xp (StreakFlame hides itself
+              when the streak is cold) + 🪙coins. Nothing at all at zero. */}
+          {stats && (
+            <div className="flex shrink-0 items-center gap-1.5">
+              <StreakFlame days={stats.streak.current} xp={stats.xp} />
+              {stats.coins > 0 && (
+                <span
+                  aria-label={copy.home.coinsAria}
+                  className="flex items-center gap-1 rounded-full bg-[var(--secondary)] px-3 py-1 text-xs font-bold text-[var(--secondary-foreground)]"
+                >
+                  🪙 {toFaDigits(stats.coins)}
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         {loading ? (
@@ -207,13 +240,14 @@ export default function HomeScreen() {
             <MessageCircle className="size-6 text-[var(--primary)]" aria-hidden />
             <span className="text-xs font-bold">گفتگو</span>
           </button>
-          <div className="relative flex flex-col items-center gap-2 rounded-3xl border border-dashed border-[var(--border)] bg-[var(--card)]/50 p-4 opacity-70">
-            <GraduationCap className="size-6 text-[var(--muted-foreground)]" aria-hidden />
-            <span className="text-xs font-bold text-[var(--muted-foreground)]">درس‌ها</span>
-            <Badge className="absolute -top-2 rounded-full bg-[var(--streak)] px-2 text-[9px] text-[var(--streak-foreground)]">
-              به‌زودی
-            </Badge>
-          </div>
+          <button
+            type="button"
+            onClick={() => go("courses")}
+            className="flex flex-col items-center gap-2 rounded-3xl border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm transition-transform active:scale-95"
+          >
+            <GraduationCap className="size-6 text-[var(--primary)]" aria-hidden />
+            <span className="text-xs font-bold">{copy.home.lessonsTile}</span>
+          </button>
         </div>
       </div>
     </AppShell>

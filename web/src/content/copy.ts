@@ -50,6 +50,12 @@ export const copy = {
     { command: "bill", description: "استعلام قبض" },
     { command: "web", description: "ورود به نسخهٔ وب" },
   ],
+  // /home (task 12): the درس‌ها quick action goes live and the gamification
+  // strip sits beside the greeting — hidden entirely at the zero state.
+  home: {
+    lessonsTile: "درس‌ها",
+    coinsAria: "سکه‌ها",
+  },
   onboardingWizard: {
     loading: "…در حال آماده‌سازی",
     startBtn: "شروع کن 🚀",
