@@ -45,19 +45,15 @@
 ```ts
 // web/tests/courseCatalog.test.ts
 import { describe, expect, it } from "vitest";
-import { getCourses } from "@/lib/courses/catalog";
+import { getCourses, getCourse, hasAudio } from "@/lib/courses/catalog";
 
 describe("course catalog", () => {
-  it("loads courses from the registry; bill-literacy present with 6 lessons",
-    () => {
-      const courses = getCourses();
-      expect(courses.map((c) => c.slug)).toContain("bill-literacy");
-      const c = courses.find((x) => x.slug === "bill-literacy")!;
-      expect(c.lessons).toHaveLength(6);
-    });
+  it("loads from the registry (empty until Task 3 authors the pilot)", () => {
+    expect(getCourses()).toEqual([]); // registry placeholder exports []
+    expect(getCourse("bill-literacy")).toBeUndefined();
+  });
   it("hasAudio is false when no file exists", () => {
-    const c = getCourses().find((x) => x.slug === "bill-literacy")!;
-    expect(hasAudio(c.slug, c.lessons[0].slug, "intro")).toBe(false);
+    expect(hasAudio("any-course", "any-lesson", "intro")).toBe(false);
   });
 });
 ```
