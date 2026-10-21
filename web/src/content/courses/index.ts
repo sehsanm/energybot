@@ -1,7 +1,8 @@
 // Course registry: re-exports every <course-slug>/course.ts so the catalog has
-// one static import. Empty until the pilot course (bill-literacy) is authored —
-// the content task replaces this file's contents, not its shape.
+// one static import. tests/courseContent.test.ts fails if a course dir under
+// src/content/courses is missing from this list (or vice versa).
 
 import type { Course } from "@/lib/courses/schema";
+import { billLiteracy } from "./bill-literacy/course";
 
-export const courses = [] as Course[];
+export const courses: Course[] = [billLiteracy];
