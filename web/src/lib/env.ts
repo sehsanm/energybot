@@ -41,6 +41,7 @@ export const env = {
     fallbackModel: raw("AI_FALLBACK_MODEL") ?? "",
   }),
   aiMemoryEnabled: () => raw("AI_MEMORY_ENABLED") !== "false",
+  geminiApiKey: () => raw("GEMINI_API_KEY") ?? "",
 
   admin: () => ({
     bootstrapEmail: raw("ADMIN_BOOTSTRAP_EMAIL") ?? "admin@energybot.local",

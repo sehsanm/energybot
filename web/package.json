@@ -10,7 +10,8 @@
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
     "db:studio": "drizzle-kit studio",
-    "migrate:legacy": "tsx scripts/migrate-from-legacy.ts"
+    "migrate:legacy": "tsx scripts/migrate-from-legacy.ts",
+    "gen:audio": "tsx scripts/gen-course-audio.ts"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.65",
