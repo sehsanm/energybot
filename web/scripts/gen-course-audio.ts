@@ -111,6 +111,7 @@ export function pcmToMp3(pcm: Buffer, sampleRate: number): Promise<Buffer> {
     ff.stdout.on("data", (c: Buffer) => out.push(c));
     ff.stderr.on("data", (c: Buffer) => (stderr += c.toString()));
     ff.on("error", reject); // ENOENT when ffmpeg is not installed
+    ff.stdin.on("error", reject); // EPIPE when ffmpeg exits before draining stdin
     ff.on("close", (code) =>
       code === 0 ? resolve(Buffer.concat(out)) : reject(new Error(`ffmpeg exited ${code}: ${stderr.trim()}`)),
     );

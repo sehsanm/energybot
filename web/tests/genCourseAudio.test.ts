@@ -11,6 +11,7 @@ import {
   TTS_STYLE_PROMPT,
   audioPath,
   collectAudioJobs,
+  pcmToMp3,
   pcmToWav,
   pendingJobs,
 } from "../scripts/gen-course-audio";
@@ -97,6 +98,16 @@ describe("pcmToWav", () => {
     expect(wav.subarray(36, 40).toString()).toBe("data");
     expect(wav.readUInt32LE(40)).toBe(pcm.length);
     expect(wav.subarray(44)).toEqual(pcm);
+  });
+});
+
+describe("pcmToMp3", () => {
+  it("rejects (does not crash) when ffmpeg exits before draining stdin", async () => {
+    // Invalid sample rate makes ffmpeg exit at arg parsing; a large buffer
+    // keeps Node writing into the dead pipe → EPIPE on stdin, which must
+    // surface as a rejection, not an unhandled stream error.
+    const big = Buffer.alloc(8 * 1024 * 1024, 1);
+    await expect(pcmToMp3(big, Number.NaN)).rejects.toThrow();
   });
 });
 
