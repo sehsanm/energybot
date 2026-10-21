@@ -115,11 +115,20 @@ export default function HomeScreen() {
             <p className="text-xs text-[var(--muted-foreground)]">سلام</p>
             <h1 className="text-xl font-black leading-tight">{firstName} 👋</h1>
           </div>
-          {/* v3 gamification strip: streak + ⚡xp (StreakFlame hides itself
-              when the streak is cold) + 🪙coins. Nothing at all at zero. */}
+          {/* v3 gamification strip: streak flame + ⚡xp + 🪙coins. Each part
+              gates on its own value — a cold streak must not hide earned xp
+              (StreakFlame renders null at days 0). Nothing at all at zero. */}
           {stats && (
             <div className="flex shrink-0 items-center gap-1.5">
-              <StreakFlame days={stats.streak.current} xp={stats.xp} />
+              {stats.streak.current > 0 && <StreakFlame days={stats.streak.current} />}
+              {stats.xp > 0 && (
+                <span
+                  aria-label={copy.home.xpAria}
+                  className="flex items-center gap-1 rounded-full bg-[var(--secondary)] px-3 py-1 text-xs font-bold text-[var(--secondary-foreground)]"
+                >
+                  ⚡ {toFaDigits(stats.xp)}
+                </span>
+              )}
               {stats.coins > 0 && (
                 <span
                   aria-label={copy.home.coinsAria}

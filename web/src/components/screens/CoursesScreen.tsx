@@ -56,14 +56,27 @@ interface CatalogJson {
 
 const c = copy.coursesScreen;
 
-/** XP/coins/streak strip; StreakFlame hides itself, so fresh accounts show nothing. */
+/** XP/coins/streak strip; hidden entirely while every counter is zero. */
 function StatsStrip({ me }: { me?: MeJson }) {
   if (!me || (me.xp <= 0 && me.coins <= 0 && me.streak.current <= 0)) return null;
   return (
     <div className="flex items-center gap-1.5">
-      <StreakFlame days={me.streak.current} xp={me.xp} />
+      {/* StreakFlame renders null at days 0 — gate it on the streak itself so
+          a cold streak can't take the earned-xp chip down with it. */}
+      {me.streak.current > 0 && <StreakFlame days={me.streak.current} />}
+      {me.xp > 0 && (
+        <span
+          aria-label={copy.home.xpAria}
+          className="flex items-center gap-1 rounded-full bg-[var(--secondary)] px-3 py-1 text-xs font-bold text-[var(--secondary-foreground)]"
+        >
+          ⚡ {toFaDigits(me.xp)}
+        </span>
+      )}
       {me.coins > 0 && (
-        <span className="flex items-center gap-1 rounded-full bg-[var(--secondary)] px-3 py-1 text-xs font-bold text-[var(--secondary-foreground)]">
+        <span
+          aria-label={copy.home.coinsAria}
+          className="flex items-center gap-1 rounded-full bg-[var(--secondary)] px-3 py-1 text-xs font-bold text-[var(--secondary-foreground)]"
+        >
           🪙 {toFaDigits(me.coins)}
         </span>
       )}

@@ -17,9 +17,21 @@ describe("home gamification wiring", () => {
     expect(home).toMatch(/streak:\s*\{\s*current/);
   });
 
-  test("renders StreakFlame from the real streak and xp once /api/me answers", () => {
+  test("the flame renders only for a live streak — chips stand on their own values", () => {
     expect(home).toContain("StreakFlame");
-    expect(home).toMatch(/StreakFlame\s+days=\{stats\.streak\.current\}\s+xp=\{stats\.xp\}/);
+    // The flame is conditioned on the streak at the screen level: a cold
+    // streak (StreakFlame returns null at days 0) can no longer take the
+    // earned-xp chip down with it.
+    expect(home).toMatch(
+      /stats\.streak\.current > 0 &&\s*<StreakFlame\s+days=\{stats\.streak\.current\}\s*\/>/,
+    );
+    expect(home).toMatch(/stats\.xp > 0 &&/);
+    expect(home).toMatch(/⚡\s*\{toFaDigits\(stats\.xp\)\}/);
+    expect(home).toMatch(/stats\.coins > 0 &&/);
+    expect(home).toMatch(/🪙\s*\{toFaDigits\(stats\.coins\)\}/);
+    // both chips are announced, at parity with StreakFlame's «استریک …» aria
+    expect(home).toContain("aria-label={copy.home.xpAria}");
+    expect(home).toContain("aria-label={copy.home.coinsAria}");
   });
 
   test("the strip is zero-guarded — nothing renders until a counter is nonzero", () => {
@@ -47,5 +59,10 @@ describe("home copy", () => {
   test("carries the live درس‌ها tile label from copy, not an inline string", () => {
     expect(copy.home.lessonsTile).toBe("درس‌ها");
     expect(home).toContain("copy.home.lessonsTile");
+  });
+
+  test("carries aria labels for the xp and coins chips", () => {
+    expect(copy.home.xpAria).toBe("امتیاز");
+    expect(copy.home.coinsAria).toBe("سکه‌ها");
   });
 });

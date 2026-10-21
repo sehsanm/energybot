@@ -39,6 +39,18 @@ describe("courses screen wiring", () => {
     expect(screen).toContain("StreakFlame");
   });
 
+  test("strip chips render independently of the flame — xp survives a cold streak", () => {
+    // StreakFlame returns null at days 0, so the screen must gate the flame on
+    // the streak itself and let the xp/coins chips stand on their own values.
+    expect(screen).toMatch(
+      /me\.streak\.current > 0 &&\s*<StreakFlame\s+days=\{me\.streak\.current\}\s*\/>/,
+    );
+    expect(screen).toMatch(/me\.xp > 0 &&/);
+    expect(screen).toMatch(/⚡\s*\{toFaDigits\(me\.xp\)\}/);
+    // coin chip aria, at parity with the home strip
+    expect(screen).toContain("aria-label={copy.home.coinsAria}");
+  });
+
   test("renders the «به‌زودی» ghosts from copy, not a hardcoded list", () => {
     expect(screen).toMatch(/\.ghosts/);
   });

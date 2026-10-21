@@ -54,6 +54,7 @@ export const copy = {
   // strip sits beside the greeting — hidden entirely at the zero state.
   home: {
     lessonsTile: "درس‌ها",
+    xpAria: "امتیاز",
     coinsAria: "سکه‌ها",
   },
   onboardingWizard: {
