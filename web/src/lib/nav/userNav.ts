@@ -4,7 +4,7 @@
 //    memory routing; no pushState), stack ops below
 // Pure logic — no React, no DOM; unit-tested directly.
 
-export type ScreenKey = "home" | "chat" | "bills" | "profile";
+export type ScreenKey = "home" | "courses" | "bills" | "chat" | "profile";
 
 export interface UserScreen {
   key: ScreenKey;
@@ -16,8 +16,9 @@ export interface UserScreen {
 
 export const USER_SCREENS: readonly UserScreen[] = [
   { key: "home", href: "/home", label: "خانه", icon: "🏠" },
-  { key: "chat", href: "/chat", label: "گفتگو", icon: "💬" },
+  { key: "courses", href: "/courses", label: "درس‌ها", icon: "🎓" },
   { key: "bills", href: "/bills", label: "قبض‌ها", icon: "📄" },
+  { key: "chat", href: "/chat", label: "گفتگو", icon: "💬" },
   { key: "profile", href: "/profile", label: "پروفایل", icon: "👤" },
 ] as const;
 

@@ -6,13 +6,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, MessageCircle, Receipt, User } from "lucide-react";
+import { GraduationCap, Home, MessageCircle, Receipt, User } from "lucide-react";
 import { useUserNav } from "@/lib/nav/UserNav";
 import { USER_SCREENS } from "@/lib/nav/userNav";
 import { cn } from "@/lib/utils";
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   home: Home,
+  courses: GraduationCap,
   chat: MessageCircle,
   bills: Receipt,
   profile: User,

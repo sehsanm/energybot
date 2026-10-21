@@ -15,15 +15,19 @@ import { copy } from "../src/content/copy";
 const root = join(dirname(__filename), "..");
 
 describe("user-app navigation (dual-mode: web routes / embedded memory)", () => {
-  test("covers the four screens with stable keys and hrefs", () => {
+  test("covers the five screens with stable keys, hrefs and labels", () => {
     const keys = USER_SCREENS.map((s) => s.key);
-    expect(keys).toEqual(["home", "chat", "bills", "profile"]);
+    expect(keys).toEqual(["home", "courses", "bills", "chat", "profile"]);
     const hrefs = USER_SCREENS.map((s) => s.href);
-    expect(hrefs).toEqual(["/home", "/chat", "/bills", "/profile"]);
+    expect(hrefs).toEqual(["/home", "/courses", "/bills", "/chat", "/profile"]);
+    const courses = USER_SCREENS.find((s) => s.key === "courses")!;
+    expect(courses.label).toBe("درس‌ها");
+    expect(courses.icon).toBe("🎓");
   });
 
   test("paths map to screen keys (unknown falls back to home)", () => {
     expect(screenKeyForPath("/home")).toBe("home");
+    expect(screenKeyForPath("/courses")).toBe("courses");
     expect(screenKeyForPath("/chat")).toBe("chat");
     expect(screenKeyForPath("/bills")).toBe("bills");
     expect(screenKeyForPath("/profile")).toBe("profile");
@@ -59,6 +63,11 @@ describe("user-app navigation (dual-mode: web routes / embedded memory)", () => 
     s = pushScreen(s, "chat");
     s = resetScreen(s, "profile");
     expect(s.stack).toEqual(["profile"]);
+    expect(popScreen(s)).toBeNull();
+
+    // deep link straight into درس‌ها
+    s = resetScreen(s, "courses");
+    expect(s.stack).toEqual(["courses"]);
     expect(popScreen(s)).toBeNull();
   });
 

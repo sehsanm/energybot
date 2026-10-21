@@ -20,6 +20,7 @@ import {
   type ScreenKey,
 } from "@/lib/nav/userNav";
 import HomeScreen from "@/components/screens/HomeScreen";
+import CoursesScreen from "@/components/screens/CoursesScreen";
 import ChatScreen from "@/components/screens/ChatScreen";
 import BillsScreen from "@/components/screens/BillsScreen";
 import ProfileScreen from "@/components/screens/ProfileScreen";
@@ -82,6 +83,7 @@ export function UserNav({ initial }: { initial: ScreenKey }) {
   return (
     <UserNavContext.Provider value={value}>
       {screen === "home" && <HomeScreen />}
+      {screen === "courses" && <CoursesScreen />}
       {screen === "chat" && <ChatScreen />}
       {screen === "bills" && <BillsScreen />}
       {screen === "profile" && <ProfileScreen />}
