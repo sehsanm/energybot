@@ -2,6 +2,7 @@
 
 import { count, desc, eq, gte, sql } from "drizzle-orm";
 import { getDb, now, schema, type DB } from "@/lib/db";
+import { gamificationSummary, type GamificationSummary } from "@/lib/gamification/awards";
 
 const DAY = 86_400_000;
 
@@ -118,4 +119,35 @@ export function listUsers(db: DB = getDb(), query: string): AdminUserRow[] {
 // Kept for callers that need a single user's existence check.
 export function userExists(db: DB, id: string): boolean {
   return db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.id, id)).get() != null;
+}
+
+export interface UserGamification extends GamificationSummary {
+  /** The 10 most recent lesson completions, newest first. */
+  recentCompletions: {
+    courseSlug: string;
+    lessonSlug: string;
+    accuracy: number;
+    firstTryAccuracy: number;
+    xp: number;
+    createdAt: number;
+  }[];
+}
+
+/** The user's gamification state plus their last 10 lesson completions. */
+export function userGamification(db: DB = getDb(), userId: string): UserGamification {
+  const recentCompletions = db
+    .select({
+      courseSlug: schema.lessonCompletions.courseSlug,
+      lessonSlug: schema.lessonCompletions.lessonSlug,
+      accuracy: schema.lessonCompletions.accuracy,
+      firstTryAccuracy: schema.lessonCompletions.firstTryAccuracy,
+      xp: schema.lessonCompletions.xp,
+      createdAt: schema.lessonCompletions.createdAt,
+    })
+    .from(schema.lessonCompletions)
+    .where(eq(schema.lessonCompletions.userId, userId))
+    .orderBy(desc(schema.lessonCompletions.createdAt))
+    .limit(10)
+    .all();
+  return { ...gamificationSummary(db, userId), recentCompletions };
 }

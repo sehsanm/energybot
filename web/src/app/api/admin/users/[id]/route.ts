@@ -4,6 +4,8 @@
 import { desc, eq } from "drizzle-orm";
 import { getDb, now, schema } from "@/lib/db";
 import { badCsrf, csrfGuard, currentAdmin, unauth } from "@/lib/auth/api";
+import { userGamification } from "@/lib/admin/queries";
+import { getCourse, getLesson } from "@/lib/courses/catalog";
 
 export const runtime = "nodejs";
 
@@ -30,6 +32,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     .orderBy(desc(schema.messages.createdAt))
     .limit(100)
     .all();
+  const gamification = userGamification(db, id);
   return Response.json({
     user: {
       id: user.id,
@@ -64,6 +67,17 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       content: m.content,
       createdAt: m.createdAt,
     })),
+    gamification: {
+      ...gamification,
+      recentCompletions: gamification.recentCompletions.map((c) => {
+        const course = getCourse(c.courseSlug);
+        return {
+          ...c,
+          courseTitle: course?.title ?? c.courseSlug,
+          lessonTitle: (course && getLesson(course, c.lessonSlug)?.title) ?? c.lessonSlug,
+        };
+      }),
+    },
   });
 }
 

@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Ban, ShieldCheck, SendHorizonal } from "lucide-react";
+import { Ban, ShieldCheck, SendHorizonal, Zap, Coins, Flame, Snowflake, GraduationCap } from "lucide-react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/client/api";
+import { BADGES } from "@/lib/gamification/engine"; // pure module — client-safe
 
 interface Detail {
   user: { id: string; displayName: string | null; isBlocked: boolean; createdAt: number; lastSeenAt: number | null };
@@ -29,7 +30,27 @@ interface Detail {
     suggestions: { intro: string; tips: string[] } | null;
   }[];
   messages: { id: number; channel: string; role: string; content: string; createdAt: number }[];
+  gamification: {
+    xp: number;
+    coins: number;
+    streak: { current: number; best: number; freezes: number };
+    freezes: number;
+    badges: string[];
+    lessonsCompleted: number;
+    recentCompletions: {
+      courseSlug: string;
+      lessonSlug: string;
+      courseTitle: string;
+      lessonTitle: string;
+      accuracy: number;
+      firstTryAccuracy: number;
+      xp: number;
+      createdAt: number;
+    }[];
+  };
 }
+
+const fa = (n: number) => n.toLocaleString("fa-IR");
 
 export default function AdminUserDetail() {
   const { id } = useParams<{ id: string }>();
@@ -165,6 +186,9 @@ export default function AdminUserDetail() {
             <TabsTrigger value="messages" className="rounded-md text-xs font-bold">
               تعامل‌ها
             </TabsTrigger>
+            <TabsTrigger value="gamification" className="rounded-md text-xs font-bold">
+              دوره‌ها و امتیازها ({fa(d.gamification.lessonsCompleted)})
+            </TabsTrigger>
             <TabsTrigger value="profile" className="rounded-md text-xs font-bold">
               پروفایل
             </TabsTrigger>
@@ -235,6 +259,94 @@ export default function AdminUserDetail() {
             {d.messages.length === 0 && (
               <p className="p-2 text-sm text-[var(--muted-foreground)]">تعاملی ثبت نشده.</p>
             )}
+          </TabsContent>
+
+          {/* Courses & gamification — always visible, zeros when inactive */}
+          <TabsContent value="gamification" className="space-y-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
+              {(
+                [
+                  { label: "امتیاز", value: fa(d.gamification.xp), icon: Zap },
+                  { label: "سکه", value: fa(d.gamification.coins), icon: Coins },
+                  {
+                    label: `استریک (رکورد ${fa(d.gamification.streak.best)})`,
+                    value: fa(d.gamification.streak.current),
+                    icon: Flame,
+                  },
+                  { label: "یخ‌بند", value: fa(d.gamification.freezes), icon: Snowflake },
+                  { label: "درس کامل‌شده", value: fa(d.gamification.lessonsCompleted), icon: GraduationCap },
+                ] as const
+              ).map((c) => (
+                <Card key={c.label}>
+                  <CardContent className="flex items-center gap-3 px-4 py-4">
+                    <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-[var(--secondary)] text-[var(--primary)]">
+                      <c.icon className="size-5" aria-hidden />
+                    </span>
+                    <div className="min-w-0">
+                      <div className="text-xl font-black" dir="ltr">
+                        {c.value}
+                      </div>
+                      <div className="truncate text-[11px] text-[var(--muted-foreground)]">{c.label}</div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            <Card>
+              <CardContent className="space-y-2 px-4 py-4">
+                <h2 className="text-sm font-black">نشان‌ها</h2>
+                {d.gamification.badges.length === 0 ? (
+                  <p className="text-sm text-[var(--muted-foreground)]">هنوز نشانی کسب نشده است.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {d.gamification.badges.map((k) => (
+                      <Badge key={k} variant="secondary" className="rounded-full px-3 text-[11px]" title={BADGES[k]?.description}>
+                        🏅 {BADGES[k]?.title ?? k}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="px-4 py-4">
+                <h2 className="mb-3 text-sm font-black">آخرین درس‌ها</h2>
+                {d.gamification.recentCompletions.length === 0 ? (
+                  <p className="text-sm text-[var(--muted-foreground)]">هنوز درسی تکمیل نشده است.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead className="text-[var(--muted-foreground)]">
+                        <tr className="border-b border-[var(--border)]">
+                          <th className="px-2 py-2 text-right font-bold">درس</th>
+                          <th className="px-2 py-2 text-right font-bold">دوره</th>
+                          <th className="px-2 py-2 text-right font-bold">دقت</th>
+                          <th className="px-2 py-2 text-right font-bold">امتیاز</th>
+                          <th className="px-2 py-2 text-right font-bold">تاریخ</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {d.gamification.recentCompletions.map((c) => (
+                          <tr key={`${c.courseSlug}/${c.lessonSlug}/${c.createdAt}`} className="border-b border-[var(--border)]/50 last:border-0">
+                            <td className="px-2 py-2 font-bold">{c.lessonTitle}</td>
+                            <td className="px-2 py-2 text-[var(--muted-foreground)]">{c.courseTitle}</td>
+                            <td className="whitespace-nowrap px-2 py-2">{fa(Math.round(c.accuracy * 100))}٪</td>
+                            <td className="whitespace-nowrap px-2 py-2" dir="ltr">
+                              {fa(c.xp)}
+                            </td>
+                            <td className="whitespace-nowrap px-2 py-2 text-[var(--muted-foreground)]" dir="ltr">
+                              {new Date(c.createdAt).toLocaleString("fa-IR")}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="profile">
