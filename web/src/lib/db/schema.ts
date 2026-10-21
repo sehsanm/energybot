@@ -185,3 +185,71 @@ export const userMemories = sqliteTable(
   },
   (t) => [index("ix_user_memories_user").on(t.userId, t.deletedAt)],
 );
+
+// --- v3: gamification ------------------------------------------------------
+
+// One row per lesson completion — replays allowed (engine awards XP only on
+// the first completion, replays may improve the accuracy shown on the path).
+export const lessonCompletions = sqliteTable(
+  "lesson_completions",
+  {
+    id: text("id").primaryKey(), // uuid
+    userId: text("user_id").notNull(),
+    courseSlug: text("course_slug").notNull(),
+    lessonSlug: text("lesson_slug").notNull(),
+    accuracy: real("accuracy").notNull(),
+    firstTryAccuracy: real("first_try_accuracy").notNull(),
+    xp: integer("xp").notNull(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [index("ix_lesson_completions_user").on(t.userId)],
+);
+
+// Append-only XP ledger. Kinds: lesson | perfect_bonus | course_complete.
+export const xpEvents = sqliteTable(
+  "xp_events",
+  {
+    id: text("id").primaryKey(), // uuid
+    userId: text("user_id").notNull(),
+    kind: text("kind").notNull(),
+    amount: integer("amount").notNull(),
+    ref: text("ref").notNull(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [index("ix_xp_events_user").on(t.userId)],
+);
+
+// Append-only coin ledger. Kinds: daily_lesson | course_complete | freeze_purchase.
+export const coinEvents = sqliteTable(
+  "coin_events",
+  {
+    id: text("id").primaryKey(), // uuid
+    userId: text("user_id").notNull(),
+    kind: text("kind").notNull(),
+    amount: integer("amount").notNull(),
+    ref: text("ref").notNull(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [index("ix_coin_events_user").on(t.userId)],
+);
+
+// One row per user (upserted by the engine). Dates are YYYY-MM-DD in Tehran time.
+export const streakState = sqliteTable("streak_state", {
+  userId: text("user_id").primaryKey(),
+  current: integer("current").notNull(),
+  best: integer("best").notNull(),
+  lastActiveDate: text("last_active_date").notNull(),
+  freezes: integer("freezes").notNull(), // 0 | 1
+  updatedAt: integer("updated_at").notNull(),
+});
+
+export const badgesEarned = sqliteTable(
+  "badges_earned",
+  {
+    id: text("id").primaryKey(), // uuid
+    userId: text("user_id").notNull(),
+    badgeKey: text("badge_key").notNull(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [uniqueIndex("uq_badges_earned_user_key").on(t.userId, t.badgeKey)],
+);
