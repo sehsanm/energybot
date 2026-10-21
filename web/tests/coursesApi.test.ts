@@ -262,6 +262,92 @@ describe("freeze — the outcomes the route maps to 200/400", () => {
   });
 });
 
+// --- Task 11: GET /api/courses/:courseSlug — the detail payload the lesson
+// player consumes (full definitions + per-user state + per-item audio flags).
+
+import { courseDetailView } from "@/lib/courses/apiViews";
+
+describe("courseDetailView", () => {
+  it("returns the full course definition: intro text, exercises verbatim (answers/tolerance included), xpBase", () => {
+    const db = makeTestDb();
+    seedUser(db);
+    const v = courseDetailView(db, "u1", course.slug);
+    if (!v) throw new Error("known course must resolve");
+    const c = v.course;
+    expect(c.slug).toBe(course.slug);
+    expect(c.title).toBe(course.title);
+    expect(c.description).toBe(course.description);
+    expect(c.cluster).toBe(course.cluster);
+    expect(c.lessons).toHaveLength(6);
+
+    const l1 = c.lessons[0];
+    expect(l1.slug).toBe(course.lessons[0].slug);
+    expect(l1.title).toBe(course.lessons[0].title);
+    expect(l1.articleSlug).toBe(course.lessons[0].articleSlug);
+    expect(l1.xpBase).toBe(course.lessons[0].xpBase);
+    expect(l1.intro.text).toBe(course.lessons[0].intro.text);
+    // exercise definitions ride along verbatim, kind-discriminated with answers
+    expect(l1.exercises).toEqual(course.lessons[0].exercises);
+    const e6 = l1.exercises.find((e) => e.id === "e6");
+    if (!e6 || e6.kind !== "numeric") throw new Error("e6 must be numeric");
+    expect(e6).toMatchObject({ unit: "درصد", answer: 30, tolerance: 3 });
+  });
+
+  it("fresh user: lesson 1 available, 2–6 locked, no bestAccuracy anywhere", () => {
+    const db = makeTestDb();
+    seedUser(db);
+    const c = courseDetailView(db, "u1", course.slug)!.course;
+    expect(c.lessons.map((l) => l.state)).toEqual([
+      "available",
+      "locked",
+      "locked",
+      "locked",
+      "locked",
+      "locked",
+    ]);
+    expect(c.lessons.every((l) => !("bestAccuracy" in l))).toBe(true);
+  });
+
+  it("a completion of lesson 1: completed + bestAccuracy = MAX (3dp), lesson 2 available, 3–6 locked", () => {
+    const db = makeTestDb();
+    seedUser(db);
+    seedCompletion(db, "u1", course.lessons[0].slug, 0.5);
+    seedCompletion(db, "u1", course.lessons[0].slug, 5 / 6, 1);
+    const c = courseDetailView(db, "u1", course.slug)!.course;
+    expect(c.lessons[0]).toMatchObject({ state: "completed", bestAccuracy: 0.833 });
+    expect(c.lessons[1].state).toBe("available");
+    expect(c.lessons.slice(2).every((l) => l.state === "locked")).toBe(true);
+  });
+
+  it("audio flags are false today (no audio tree yet): hasIntroAudio and every hasExerciseAudio entry", () => {
+    const db = makeTestDb();
+    seedUser(db);
+    const c = courseDetailView(db, "u1", course.slug)!.course;
+    for (const l of c.lessons) {
+      expect(l.hasIntroAudio).toBe(false);
+      expect(Object.keys(l.hasExerciseAudio).sort()).toEqual(
+        [...course.lessons.find((x) => x.slug === l.slug)!.exercises.map((e) => e.id)].sort(),
+      );
+      expect(Object.values(l.hasExerciseAudio).every((x) => x === false)).toBe(true);
+    }
+  });
+
+  it("anonymous caller (userId null): definitions without state/bestAccuracy", () => {
+    const db = makeTestDb();
+    seedUser(db);
+    seedCompletion(db, "u1", course.lessons[0].slug, 1);
+    const c = courseDetailView(db, null, course.slug)!.course;
+    expect(c.lessons).toHaveLength(6);
+    expect(c.lessons.every((l) => !("state" in l) && !("bestAccuracy" in l))).toBe(true);
+  });
+
+  it("unknown slug → null (the route's 404)", () => {
+    const db = makeTestDb();
+    seedUser(db);
+    expect(courseDetailView(db, "u1", "no-such-course")).toBeNull();
+  });
+});
+
 describe("complete + freeze route wiring (structural — no route-boundary harness exists)", () => {
   const src = (...parts: string[]) => readFileSync(join(dirname(__filename), "..", "src", "app", "api", ...parts), "utf8");
 
@@ -291,5 +377,18 @@ describe("complete + freeze route wiring (structural — no route-boundary harne
     expect(route).toContain("badCsrf()");
     expect(route).toContain("purchaseFreeze");
     expect(route).toMatch(/status:\s*400/);
+  });
+
+  it("course detail: session-gated thin wrapper over courseDetailView, 404 on unknown slug", () => {
+    const route = src("courses", "[courseSlug]", "route.ts");
+    expect(route).toContain("currentUser()"); // session gate
+    expect(route).toContain("unauth()");
+    expect(route).toContain("courseDetailView"); // the only decision is the view's null
+    expect(route).toContain('"not_found"');
+    expect(route).toMatch(/status:\s*404/);
+    // GET only — the detail route is read-only, no mutation surface
+    expect(route).not.toContain('"POST"');
+    expect(route).not.toContain('"PUT"');
+    expect(route).not.toContain('"DELETE"');
   });
 });

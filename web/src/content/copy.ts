@@ -191,6 +191,36 @@ export const copy = {
       { emoji: "🌱", label: "عادت‌ها" },
     ],
   },
+  // LessonPlayer — intro card, exercise stream, summary celebration (task 11).
+  lessonPlayer: {
+    exitAria: "خروج از درس",
+    loading: "…در حال بارگذاری درس",
+    errorTitle: "درس الان باز نشد",
+    errorDesc: "یه اشکالی پیش اومد؛ یک لحظه بعد دوباره امتحان کن. 🙏",
+    retryBtn: "تلاش دوباره",
+    submitting: "…در حال محاسبه‌ی نتیجه",
+    introLabel: "معرفی درس",
+    listenBtn: "گوش کردن به معرفی",
+    startBtn: "شروع",
+    exerciseOf: (n: number, total: number) =>
+      `سؤال ${n.toLocaleString("fa-IR")} از ${total.toLocaleString("fa-IR")}`,
+    confirmBtn: "تأیید",
+    continueBtn: "ادامه",
+    trueBtn: "درست",
+    falseBtn: "نادرست",
+    numberPlaceholder: "عدد را وارد کن",
+    emptyInputHint: "برای تأیید، اول یک عدد بنویس",
+    correctBadge: "آفرین! درست بود",
+    wrongBadge: "نادرست بود",
+    correctWas: (answer: string) => `پاسخ درست: ${answer}`,
+    summaryTitle: "درس تمام شد! 🎉",
+    accuracyOf: (pct: number) => `دقت: ${pct.toLocaleString("fa-IR")}٪`,
+    perfectCallout: "بی‌نقص! بدون حتی یک غلط ✨",
+    xpOf: (n: number) => `${n.toLocaleString("fa-IR")} امتیاز`,
+    coinsOf: (n: number) => `${n.toLocaleString("fa-IR")} سکه`,
+    badgesTitle: "نشان تازه",
+    backBtn: "بازگشت به مسیر",
+  },
 } as const;
 
 export const APP_NAME = "دستیار انرژی";

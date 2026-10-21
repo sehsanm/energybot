@@ -3,12 +3,14 @@
 // Courses screen (درس‌ها): catalog with the pilot course card + «به‌زودی»
 // ghosts, and — one tap deeper — the lesson path. The two views are in-
 // component state only (list ⇄ course), so the embedded memory-nav stays
-// untouched. Opening a lesson is delegated to `onOpenLesson` because the
-// player (task 11) mounts on top of this screen.
+// untouched. Opening a lesson mounts the LessonPlayer (task 11) on top of
+// this screen — also in-component, no routing; `onOpenLesson` stays as an
+// optional external hook.
 
 import { useEffect, useState } from "react";
 import { BookOpen, ChevronLeft, Lock, Play, Star } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import LessonPlayer from "@/components/courses/LessonPlayer";
 import { ScreenHeader } from "@/components/kit/ScreenHeader";
 import { StreakFlame } from "@/components/kit/StreakFlame";
 import { EmptyState } from "@/components/kit/EmptyState";
@@ -162,6 +164,9 @@ export default function CoursesScreen({
   const [failed, setFailed] = useState(false);
   // In-component course view (memory-nav safe): null = the catalog list.
   const [openSlug, setOpenSlug] = useState<string | null>(null);
+  // The player (task 11) mounts ON TOP of this screen — also in-component
+  // state, so the URL never moves. Done → refresh so states update.
+  const [playing, setPlaying] = useState<{ courseSlug: string; lessonSlug: string } | null>(null);
 
   const load = () => {
     setFailed(false);
@@ -174,6 +179,12 @@ export default function CoursesScreen({
   const me = data?.me;
   const courses = data?.courses ?? [];
   const course = openSlug ? courses.find((x) => x.slug === openSlug) : undefined;
+
+  /** Tapping an open lesson opens the player over the screen (no routing). */
+  const openLesson = (lessonSlug: string) => {
+    onOpenLesson?.(lessonSlug); // external hook, if a parent ever wants it
+    if (course) setPlaying({ courseSlug: course.slug, lessonSlug });
+  };
   const done = course?.lessons.filter((l) => l.state === "completed").length ?? 0;
   const total = course?.lessons.length ?? 0;
 
@@ -228,7 +239,7 @@ export default function CoursesScreen({
                           )}
                         />
                       )}
-                      <LessonRow index={i} lesson={lesson} onOpenLesson={onOpenLesson} />
+                      <LessonRow index={i} lesson={lesson} onOpenLesson={openLesson} />
                     </div>
                   ))}
                 </div>
@@ -300,6 +311,17 @@ export default function CoursesScreen({
           </>
         )}
       </div>
+
+      {playing && (
+        <LessonPlayer
+          courseSlug={playing.courseSlug}
+          lessonSlug={playing.lessonSlug}
+          onDone={() => {
+            setPlaying(null);
+            load(); // refresh so completed/star/unlocked states update
+          }}
+        />
+      )}
     </AppShell>
   );
 }
