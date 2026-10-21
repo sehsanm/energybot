@@ -154,6 +154,41 @@ export const copy = {
       savedMsg: "ذخیره شد ✅",
     },
   },
+  // Courses screen (درس‌ها) — catalog, lesson path and the «به‌زودی» ghosts.
+  coursesScreen: {
+    title: "درس‌ها",
+    subtitle: "یادگیری قدم‌به‌قدم برای صرفه‌جویی",
+    loading: "…در حال بارگذاری",
+    errorTitle: "درس‌ها الان باز نشد",
+    errorDesc: "یه اشکالی پیش اومد؛ یک لحظه بعد دوباره امتحان کن. 🙏",
+    retryBtn: "تلاش دوباره",
+    startBtn: "شروع",
+    continueBtn: "ادامه",
+    soonTitle: "دوره‌های بعدی",
+    soonBadge: "به‌زودی",
+    progressOf: (done: number, total: number) =>
+      `${done.toLocaleString("fa-IR")} از ${total.toLocaleString("fa-IR")}`,
+    lessonsDone: (done: number, total: number) =>
+      `${done.toLocaleString("fa-IR")} از ${total.toLocaleString("fa-IR")} درس کامل شده`,
+    lessonOf: (n: number) => `درس ${n.toLocaleString("fa-IR")}`,
+    accuracyOf: (pct: number) => `دقت: ${pct.toLocaleString("fa-IR")}٪`,
+    lockedBadge: "قفل",
+    lockedAria: "این درس هنوز قفل است",
+    openAria: "شروع درس",
+    // The 10 clusters that get their own course after the pilot (درس‌ها ghosts).
+    ghosts: [
+      { emoji: "❄️", label: "سرمایش" },
+      { emoji: "🔥", label: "گرمایش" },
+      { emoji: "🚿", label: "آب گرم" },
+      { emoji: "🍳", label: "آشپزخانه" },
+      { emoji: "🔌", label: "لوازم خانگی" },
+      { emoji: "💡", label: "روشنایی" },
+      { emoji: "🧱", label: "بدنه ساختمان" },
+      { emoji: "☀️", label: "خورشیدی" },
+      { emoji: "🛡️", label: "ایمنی" },
+      { emoji: "🌱", label: "عادت‌ها" },
+    ],
+  },
 } as const;
 
 export const APP_NAME = "دستیار انرژی";

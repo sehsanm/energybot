@@ -1,0 +1,81 @@
+// Structural wiring checks for the courses screen (درس‌ها) — the same fs-read
+// approach as onboardingWiring.test.ts (the repo has no DOM test env by
+// design). The screen must be memory-nav safe (two in-component views, no
+// router) and hand lesson opening to the player via the onOpenLesson prop
+// (task 11 mounts the player on top of this screen).
+
+import { readFileSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { describe, test, expect } from "vitest";
+import { copy } from "../src/content/copy";
+
+const root = join(dirname(__filename), "..");
+const screen = readFileSync(join(root, "src/components/screens/CoursesScreen.tsx"), "utf8");
+
+describe("courses screen wiring", () => {
+  test("loads the catalog from GET /api/courses through the shared api helper", () => {
+    expect(screen).toContain("/api/courses");
+    expect(screen).toContain('from "@/lib/client/api"');
+  });
+
+  test("renders all three lesson states: locked, available, completed", () => {
+    expect(screen).toContain("locked");
+    expect(screen).toContain("available");
+    expect(screen).toContain("completed");
+  });
+
+  test("two in-component views only — memory-nav safe, no router navigation", () => {
+    expect(screen).not.toContain("useRouter");
+    expect(screen).not.toContain("router.push");
+    expect(screen).not.toContain("pushState");
+  });
+
+  test("opens lessons through the onOpenLesson prop (player mounts on top)", () => {
+    expect(screen).toMatch(/onOpenLesson/);
+    expect(screen).toContain("onOpenLesson?.(");
+  });
+
+  test("shows the streak/XP strip via StreakFlame", () => {
+    expect(screen).toContain("StreakFlame");
+  });
+
+  test("renders the «به‌زودی» ghosts from copy, not a hardcoded list", () => {
+    expect(screen).toMatch(/\.ghosts/);
+  });
+});
+
+describe("coursesScreen copy", () => {
+  test("carries the header, progress and accuracy strings in Persian digits", () => {
+    const c = copy.coursesScreen;
+    expect(c.title).toBe("درس‌ها");
+    expect(c.subtitle).toBeTruthy();
+    expect(c.soonBadge).toBe("به‌زودی");
+    expect(c.progressOf(2, 6)).toBe("۲ از ۶");
+    expect(c.accuracyOf(83)).toBe("دقت: ۸۳٪");
+  });
+
+  test("carries loading, fetch-failure and retry copy (EmptyState pattern)", () => {
+    const c = copy.coursesScreen;
+    expect(c.loading).toBeTruthy();
+    expect(c.errorTitle).toBeTruthy();
+    expect(c.errorDesc).toBeTruthy();
+    expect(c.retryBtn).toBeTruthy();
+  });
+
+  test("ghost cards cover all 10 upcoming clusters in the spec order", () => {
+    expect(copy.coursesScreen.ghosts.map((g) => g.label)).toEqual([
+      "سرمایش",
+      "گرمایش",
+      "آب گرم",
+      "آشپزخانه",
+      "لوازم خانگی",
+      "روشنایی",
+      "بدنه ساختمان",
+      "خورشیدی",
+      "ایمنی",
+      "عادت‌ها",
+    ]);
+    // every ghost keeps the copy style: an emoji accent per cluster
+    for (const g of copy.coursesScreen.ghosts) expect(g.emoji).toBeTruthy();
+  });
+});
