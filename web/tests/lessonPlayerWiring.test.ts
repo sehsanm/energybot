@@ -69,6 +69,19 @@ describe("lesson player wiring", () => {
     expect(player).not.toContain("autoPlay");
   });
 
+  test("every exercise prompt with audio gets a play/pause button for its own MP3", () => {
+    expect(player).toContain("lesson.hasExerciseAudio[ex.id]");
+    expect(player).toContain("playPrompt(ex.id)");
+    expect(player).toContain("playingId === ex.id");
+    expect(player).toContain("/audio/courses/${courseSlug}/${lessonSlug}/${id}.mp3");
+  });
+
+  test("one shared audio element pauses on exercise/step changes and unmount", () => {
+    expect(player).toContain("audioRef.current?.pause()");
+    expect(player).toContain("[index, step, courseSlug, lessonSlug]");
+    expect(player).toContain("setPlayingId(null)");
+  });
+
   test("summary renders the server-computed award, not client claims", () => {
     expect(player).toContain("BADGES"); // badge titles from the engine's map
     expect(player).toContain("StreakFlame");
@@ -122,6 +135,11 @@ describe("lessonPlayer copy", () => {
     expect(c.errorTitle).toBeTruthy();
     expect(c.errorDesc).toBeTruthy();
     expect(c.retryBtn).toBeTruthy();
+  });
+
+  test("carries per-question play/pause copy", () => {
+    expect(copy.lessonPlayer.listenQuestionBtn).toBe("گوش کردن به سؤال");
+    expect(copy.lessonPlayer.pauseQuestionBtn).toBe("توقف صدا");
   });
 
   test("reveals the correct answer after a miss", () => {

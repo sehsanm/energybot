@@ -10,7 +10,7 @@
 // AwardResult the complete endpoint computes.
 
 import { useEffect, useRef, useState } from "react";
-import { CheckCircle2, Volume2, X, XCircle } from "lucide-react";
+import { CheckCircle2, Pause, Volume2, X, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -125,6 +125,7 @@ export default function LessonPlayer({
   // miss-then-corrected exercise can never score first-try (بی‌نقص) server-side
   const firstTryRef = useRef<Set<string>>(new Set());
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [playingId, setPlayingId] = useState<string | null>(null);
   /** decided from the state fetched BEFORE playing — gates the confetti */
   const [firstCompletion, setFirstCompletion] = useState(true);
 
@@ -142,8 +143,12 @@ export default function LessonPlayer({
   };
   useEffect(load, [courseSlug, lessonSlug]);
 
-  // intro audio must not keep playing after the player unmounts (× / done)
+  // Audio must not keep playing after unmount or across exercise/step changes.
   useEffect(() => () => audioRef.current?.pause(), []);
+  useEffect(() => {
+    audioRef.current?.pause();
+    setPlayingId(null);
+  }, [index, step, courseSlug, lessonSlug]);
 
   const ex = queue[index];
 
@@ -156,13 +161,24 @@ export default function LessonPlayer({
     setFeedback(null);
   }, [index]);
 
-  function playIntro() {
-    // tap-to-play only — no autoplay attribute, this click IS the gesture
-    const a = audioRef.current ?? new Audio(`/audio/courses/${courseSlug}/${lessonSlug}/intro.mp3`);
+  function playPrompt(id: string) {
+    // One shared element: a second tap pauses; another prompt stops the last one.
+    // Every play() is inside this click handler — never autoplay.
+    const a = audioRef.current ?? new Audio();
+    if (playingId === id && !a.paused) {
+      a.pause();
+      setPlayingId(null);
+      return;
+    }
     audioRef.current = a;
-    a.currentTime = 0;
+    a.pause();
+    a.src = `/audio/courses/${courseSlug}/${lessonSlug}/${id}.mp3`;
+    a.onended = () => setPlayingId((current) => (current === id ? null : current));
+    a.onerror = () => setPlayingId((current) => (current === id ? null : current));
+    setPlayingId(id);
     void a.play().catch(() => {
-      /* a missing/unloadable file must never break the lesson */
+      // A missing/unloadable file must never break the lesson.
+      setPlayingId((current) => (current === id ? null : current));
     });
   }
 
@@ -258,7 +274,7 @@ export default function LessonPlayer({
               <Button
                 variant="secondary"
                 className="mt-4 h-11 w-full rounded-full text-sm font-bold"
-                onClick={playIntro}
+                onClick={() => playPrompt("intro")}
               >
                 <Volume2 className="size-4" aria-hidden />
                 {c.listenBtn}
@@ -356,6 +372,18 @@ export default function LessonPlayer({
               </p>
             )}
             <p className="text-sm font-bold leading-7">{ex.prompt}</p>
+            {lesson.hasExerciseAudio[ex.id] && (
+              <Button
+                type="button"
+                variant="secondary"
+                className="mt-3 h-9 rounded-full px-3 text-xs font-bold"
+                onClick={() => playPrompt(ex.id)}
+                aria-label={playingId === ex.id ? c.pauseQuestionBtn : c.listenQuestionBtn}
+              >
+                {playingId === ex.id ? <Pause className="size-4" aria-hidden /> : <Volume2 className="size-4" aria-hidden />}
+                {playingId === ex.id ? c.pauseQuestionBtn : c.listenQuestionBtn}
+              </Button>
+            )}
 
             {ex.kind === "mcq" && (
               <div className="mt-4 space-y-2">

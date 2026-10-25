@@ -216,6 +216,8 @@ export const copy = {
     submitting: "…در حال محاسبه‌ی نتیجه",
     introLabel: "معرفی درس",
     listenBtn: "گوش کردن به معرفی",
+    listenQuestionBtn: "گوش کردن به سؤال",
+    pauseQuestionBtn: "توقف صدا",
     startBtn: "شروع",
     exerciseOf: (n: number, total: number) =>
       `سؤال ${n.toLocaleString("fa-IR")} از ${total.toLocaleString("fa-IR")}`,
