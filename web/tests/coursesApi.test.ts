@@ -39,7 +39,7 @@ function seedCompletion(db: DB, userId: string, lessonSlug: string, accuracy: nu
 }
 
 describe("coursesCatalogView — authed", () => {
-  it("no completions: lesson 1 available, lessons 2–6 locked, zero me, hasAudio false", () => {
+  it("no completions: lesson 1 available, lessons 2–6 locked, zero me, intro audio available", () => {
     const db = makeTestDb();
     seedUser(db);
     const v = coursesCatalogView(db, "u1");
@@ -51,7 +51,7 @@ describe("coursesCatalogView — authed", () => {
     expect(c.description).toBe(course.description);
     expect(c.lessons).toHaveLength(6);
     expect(c.lessons.map((l) => l.state)).toEqual(["available", "locked", "locked", "locked", "locked", "locked"]);
-    expect(c.lessons.every((l) => l.hasAudio === false)).toBe(true); // no audio tree yet
+    expect(c.lessons.every((l) => l.hasAudio === true)).toBe(true); // generated intro audio is committed
     expect(c.lessons.every((l) => !("bestAccuracy" in l))).toBe(true);
 
     expect(v.me).toEqual({ xp: 0, coins: 0, streak: { current: 0, best: 0, freezes: 0 }, badges: [] });
@@ -82,7 +82,7 @@ describe("coursesCatalogView — anonymous", () => {
     const c = v.courses[0];
     expect(c.lessons.map((l) => l.slug)).toEqual(course.lessons.map((l) => l.slug));
     expect(c.lessons.every((l) => !("state" in l) && !("bestAccuracy" in l))).toBe(true);
-    expect(c.lessons.every((l) => l.hasAudio === false)).toBe(true);
+    expect(c.lessons.every((l) => l.hasAudio === true)).toBe(true);
   });
 });
 
@@ -359,16 +359,16 @@ describe("courseDetailView", () => {
     expect(c.lessons.slice(2).every((l) => l.state === "locked")).toBe(true);
   });
 
-  it("audio flags are false today (no audio tree yet): hasIntroAudio and every hasExerciseAudio entry", () => {
+  it("audio flags reflect the generated tree: hasIntroAudio and every hasExerciseAudio entry", () => {
     const db = makeTestDb();
     seedUser(db);
     const c = courseDetailView(db, "u1", course.slug)!.course;
     for (const l of c.lessons) {
-      expect(l.hasIntroAudio).toBe(false);
+      expect(l.hasIntroAudio).toBe(true);
       expect(Object.keys(l.hasExerciseAudio).sort()).toEqual(
         [...course.lessons.find((x) => x.slug === l.slug)!.exercises.map((e) => e.id)].sort(),
       );
-      expect(Object.values(l.hasExerciseAudio).every((x) => x === false)).toBe(true);
+      expect(Object.values(l.hasExerciseAudio).every((x) => x === true)).toBe(true);
     }
   });
 
