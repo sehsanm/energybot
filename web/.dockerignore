@@ -1,0 +1,11 @@
+node_modules
+.next
+data
+.shots
+.playwright-mcp
+coverage
+.env
+.env.*
+*.log
+Dockerfile
+.dockerignore
