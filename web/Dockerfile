@@ -3,12 +3,15 @@
 # and the compiled app. The build image can also run scripts/migrate-from-legacy.ts.
 
 FROM node:22-slim AS build
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends python3 make g++ \
+ && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY package*.json ./
 RUN npm ci
 COPY . .
-RUN npm run build
+RUN npm run build && npm prune --omit=dev
 
 FROM node:22-slim AS runtime
 WORKDIR /app
@@ -17,7 +20,7 @@ ENV NODE_ENV=production \
     DATABASE_PATH=/data/energybot.db \
     PORT=8000
 COPY package*.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/.next ./.next
 COPY --from=build /app/public ./public
 COPY --from=build /app/src ./src
